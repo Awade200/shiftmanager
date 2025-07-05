@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import Tesseract from 'tesseract.js';
-import * as pdfParse from 'pdf-parse';
 import { OCRResult } from '@/types/shift';
 
 export const useOCR = () => {
@@ -12,44 +11,16 @@ export const useOCR = () => {
     setProgress(0);
 
     try {
-      let text = '';
-      
-      if (file.type === 'application/pdf') {
-        // Try PDF text extraction first
-        try {
-          setProgress(25);
-          const arrayBuffer = await file.arrayBuffer();
-          const pdfData = await pdfParse(arrayBuffer);
-          text = pdfData.text;
-          setProgress(50);
-          
-          console.log('PDF text extracted:', text);
-          
-          // If we got meaningful text, use it
-          if (text.trim().length > 50) {
-            const shifts = parseRotaText(text);
-            if (shifts.length > 0) {
-              return shifts;
-            }
-          }
-        } catch (pdfError) {
-          console.log('PDF text extraction failed, falling back to OCR:', pdfError);
-        }
-      }
-      
-      // Fall back to OCR for images or if PDF text extraction failed
-      setProgress(file.type === 'application/pdf' ? 60 : 25);
+      // Use OCR for all file types (images and PDFs)
       const result = await Tesseract.recognize(file, 'eng', {
         logger: (info) => {
           if (info.status === 'recognizing text') {
-            const baseProgress = file.type === 'application/pdf' ? 60 : 25;
-            const ocrProgress = Math.round(info.progress * 40);
-            setProgress(baseProgress + ocrProgress);
+            setProgress(Math.round(info.progress * 100));
           }
         },
       });
 
-      text = result.data.text;
+      const text = result.data.text;
       console.log('OCR text extracted:', text);
       
       // Try rota format first, then fall back to legacy format
