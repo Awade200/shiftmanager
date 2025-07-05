@@ -39,4 +39,6 @@ export interface OCRResult {
   endTime: string;
   clientName: string;
   location?: string;
+  serviceType?: string;
+  duration?: number;
 }

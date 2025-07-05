@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Tesseract from 'tesseract.js';
+import * as pdfParse from 'pdf-parse';
 import { OCRResult } from '@/types/shift';
 
 export const useOCR = () => {
@@ -11,25 +12,174 @@ export const useOCR = () => {
     setProgress(0);
 
     try {
+      let text = '';
+      
+      if (file.type === 'application/pdf') {
+        // Try PDF text extraction first
+        try {
+          setProgress(25);
+          const arrayBuffer = await file.arrayBuffer();
+          const pdfData = await pdfParse(arrayBuffer);
+          text = pdfData.text;
+          setProgress(50);
+          
+          console.log('PDF text extracted:', text);
+          
+          // If we got meaningful text, use it
+          if (text.trim().length > 50) {
+            const shifts = parseRotaText(text);
+            if (shifts.length > 0) {
+              return shifts;
+            }
+          }
+        } catch (pdfError) {
+          console.log('PDF text extraction failed, falling back to OCR:', pdfError);
+        }
+      }
+      
+      // Fall back to OCR for images or if PDF text extraction failed
+      setProgress(file.type === 'application/pdf' ? 60 : 25);
       const result = await Tesseract.recognize(file, 'eng', {
         logger: (info) => {
           if (info.status === 'recognizing text') {
-            setProgress(Math.round(info.progress * 100));
+            const baseProgress = file.type === 'application/pdf' ? 60 : 25;
+            const ocrProgress = Math.round(info.progress * 40);
+            setProgress(baseProgress + ocrProgress);
           }
         },
       });
 
-      const text = result.data.text;
-      const shifts = parseShiftText(text);
+      text = result.data.text;
+      console.log('OCR text extracted:', text);
+      
+      // Try rota format first, then fall back to legacy format
+      let shifts = parseRotaText(text);
+      if (shifts.length === 0) {
+        shifts = parseShiftText(text);
+      }
       
       return shifts;
     } catch (error) {
-      console.error('OCR Error:', error);
-      throw new Error('Failed to extract text from image');
+      console.error('Extraction Error:', error);
+      throw new Error('Failed to extract text from file');
     } finally {
       setLoading(false);
       setProgress(0);
     }
+  };
+
+  const parseRotaText = (text: string): OCRResult[] => {
+    const shifts: OCRResult[] = [];
+    
+    // Split text into blocks (each shift should be separated by empty lines or clear breaks)
+    const blocks = text.split(/\n\s*\n|\n{2,}/).filter(block => block.trim());
+    
+    for (const block of blocks) {
+      const shift = parseRotaBlock(block);
+      if (shift) {
+        shifts.push(shift);
+      }
+    }
+    
+    // If no blocks found, try line by line
+    if (shifts.length === 0) {
+      const lines = text.split('\n').filter(line => line.trim());
+      let currentShift: Partial<OCRResult> = {};
+      
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        
+        if (trimmedLine.match(/^Day:/i)) {
+          // Save previous shift if complete
+          if (currentShift.date && currentShift.startTime) {
+            shifts.push(currentShift as OCRResult);
+          }
+          currentShift = {};
+          const dateMatch = trimmedLine.match(/Day:\s*\w+\s+(\d{1,2}\/\d{1,2}\/\d{4})/i);
+          if (dateMatch) {
+            currentShift.date = convertDateFormat(dateMatch[1]);
+          }
+        } else if (trimmedLine.match(/^Client:/i)) {
+          const clientMatch = trimmedLine.match(/Client:\s*(.+)/i);
+          if (clientMatch) {
+            currentShift.clientName = clientMatch[1].trim();
+          }
+        } else if (trimmedLine.match(/^Service:/i)) {
+          const serviceMatch = trimmedLine.match(/Service:\s*(.+)/i);
+          if (serviceMatch) {
+            currentShift.serviceType = serviceMatch[1].trim();
+            currentShift.location = serviceMatch[1].trim(); // Use service as location too
+          }
+        } else if (trimmedLine.match(/^Time:/i)) {
+          const timeMatch = trimmedLine.match(/Time:\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/i);
+          if (timeMatch) {
+            currentShift.startTime = normalizeTimeString(timeMatch[1]);
+            currentShift.endTime = normalizeTimeString(timeMatch[2]);
+          }
+        } else if (trimmedLine.match(/^Quantity:/i)) {
+          const quantityMatch = trimmedLine.match(/Quantity:\s*(\d+\.?\d*)/i);
+          if (quantityMatch) {
+            currentShift.duration = parseFloat(quantityMatch[1]);
+          }
+        }
+      }
+      
+      // Add the last shift
+      if (currentShift.date && currentShift.startTime) {
+        shifts.push(currentShift as OCRResult);
+      }
+    }
+    
+    return shifts;
+  };
+
+  const parseRotaBlock = (block: string): OCRResult | null => {
+    const lines = block.split('\n').map(line => line.trim());
+    const shift: Partial<OCRResult> = {};
+    
+    for (const line of lines) {
+      if (line.match(/^Day:/i)) {
+        const dateMatch = line.match(/Day:\s*\w+\s+(\d{1,2}\/\d{1,2}\/\d{4})/i);
+        if (dateMatch) {
+          shift.date = convertDateFormat(dateMatch[1]);
+        }
+      } else if (line.match(/^Client:/i)) {
+        const clientMatch = line.match(/Client:\s*(.+)/i);
+        if (clientMatch) {
+          shift.clientName = clientMatch[1].trim();
+        }
+      } else if (line.match(/^Service:/i)) {
+        const serviceMatch = line.match(/Service:\s*(.+)/i);
+        if (serviceMatch) {
+          shift.serviceType = serviceMatch[1].trim();
+          shift.location = serviceMatch[1].trim();
+        }
+      } else if (line.match(/^Time:/i)) {
+        const timeMatch = line.match(/Time:\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/i);
+        if (timeMatch) {
+          shift.startTime = normalizeTimeString(timeMatch[1]);
+          shift.endTime = normalizeTimeString(timeMatch[2]);
+        }
+      } else if (line.match(/^Quantity:/i)) {
+        const quantityMatch = line.match(/Quantity:\s*(\d+\.?\d*)/i);
+        if (quantityMatch) {
+          shift.duration = parseFloat(quantityMatch[1]);
+        }
+      }
+    }
+    
+    // Validate required fields
+    if (shift.date && shift.startTime && shift.endTime && shift.clientName) {
+      return shift as OCRResult;
+    }
+    
+    return null;
+  };
+
+  const convertDateFormat = (dateStr: string): string => {
+    // Convert DD/MM/YYYY to YYYY-MM-DD
+    const [day, month, year] = dateStr.split('/');
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   };
 
   const parseShiftText = (text: string): OCRResult[] => {

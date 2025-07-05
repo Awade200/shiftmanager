@@ -278,27 +278,45 @@ const OCRUpload = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs">Client Name</Label>
-                      <Input
-                        type="text"
-                        value={shift.clientName}
-                        onChange={(e) => updateShift(index, 'clientName', e.target.value)}
-                        className="h-8"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label className="text-xs">Location (Optional)</Label>
-                      <Input
-                        type="text"
-                        value={shift.location || ''}
-                        onChange={(e) => updateShift(index, 'location', e.target.value)}
-                        className="h-8"
-                      />
-                    </div>
-                  </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                     <div>
+                       <Label className="text-xs">Client Name</Label>
+                       <Input
+                         type="text"
+                         value={shift.clientName}
+                         onChange={(e) => updateShift(index, 'clientName', e.target.value)}
+                         className="h-8"
+                       />
+                     </div>
+                     
+                     <div>
+                       <Label className="text-xs">Service Type</Label>
+                       <Input
+                         type="text"
+                         value={shift.serviceType || ''}
+                         onChange={(e) => updateShift(index, 'serviceType', e.target.value)}
+                         className="h-8"
+                       />
+                     </div>
+                     
+                     <div>
+                       <Label className="text-xs">Location (Optional)</Label>
+                       <Input
+                         type="text"
+                         value={shift.location || ''}
+                         onChange={(e) => updateShift(index, 'location', e.target.value)}
+                         className="h-8"
+                       />
+                     </div>
+                   </div>
+
+                   {shift.duration && (
+                     <div className="bg-accent/10 border border-accent/20 rounded-lg p-3">
+                       <p className="text-sm text-muted-foreground">
+                         <strong>Extracted Duration:</strong> {shift.duration} hours
+                       </p>
+                     </div>
+                   )}
                 </div>
               ))}
             </div>
