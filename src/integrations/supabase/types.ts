@@ -495,6 +495,54 @@ export type Database = {
         }
         Relationships: []
       }
+      shifts: {
+        Row: {
+          client_name: string
+          created_at: string
+          date: string
+          duration: number
+          earnings: number
+          end_time: string
+          hourly_rate: number
+          id: string
+          is_paid: boolean
+          location: string | null
+          start_time: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_name: string
+          created_at?: string
+          date: string
+          duration: number
+          earnings: number
+          end_time: string
+          hourly_rate: number
+          id?: string
+          is_paid?: boolean
+          location?: string | null
+          start_time: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_name?: string
+          created_at?: string
+          date?: string
+          duration?: number
+          earnings?: number
+          end_time?: string
+          hourly_rate?: number
+          id?: string
+          is_paid?: boolean
+          location?: string | null
+          start_time?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

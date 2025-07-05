@@ -20,11 +20,11 @@ const AllShifts = () => {
     setEditingShift(shift);
   };
 
-  const handleEditSubmit = (data: ShiftFormData) => {
+  const handleEditSubmit = async (data: ShiftFormData) => {
     if (!editingShift) return;
 
     try {
-      updateShift(editingShift.id, data);
+      await updateShift(editingShift.id, data);
       
       toast({
         title: "Shift updated successfully",
@@ -45,11 +45,11 @@ const AllShifts = () => {
     setDeletingShiftId(id);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deletingShiftId) return;
 
     try {
-      deleteShift(deletingShiftId);
+      await deleteShift(deletingShiftId);
       
       toast({
         title: "Shift deleted",
@@ -66,9 +66,9 @@ const AllShifts = () => {
     }
   };
 
-  const handleMarkPaid = (id: string) => {
+  const handleMarkPaid = async (id: string) => {
     try {
-      markShiftAsPaid(id);
+      await markShiftAsPaid(id);
       
       toast({
         title: "Shift marked as paid",

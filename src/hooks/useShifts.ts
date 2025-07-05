@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Shift, ShiftFormData, ShiftStats } from '@/types/shift';
 
-const STORAGE_KEY = 'shift-manager-data';
 const SETTINGS_KEY = 'shift-manager-settings';
 
 interface Settings {
@@ -17,39 +17,64 @@ export const useShifts = () => {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [loading, setLoading] = useState(true);
 
-  // Load data from localStorage on mount
+  // Load shifts from Supabase on mount
   useEffect(() => {
+    loadShifts();
+    loadSettings();
+  }, []);
+
+  const loadShifts = async () => {
     try {
-      const storedShifts = localStorage.getItem(STORAGE_KEY);
-      const storedSettings = localStorage.getItem(SETTINGS_KEY);
-      
-      if (storedShifts) {
-        setShifts(JSON.parse(storedShifts));
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('shifts')
+        .select('*')
+        .order('date', { ascending: false });
+
+      if (error) {
+        console.error('Error loading shifts:', error);
+        return;
       }
-      
+
+      // Transform database data to match Shift interface
+      const transformedShifts: Shift[] = (data || []).map(shift => ({
+        id: shift.id,
+        date: shift.date,
+        startTime: shift.start_time,
+        endTime: shift.end_time,
+        clientName: shift.client_name,
+        location: shift.location,
+        hourlyRate: Number(shift.hourly_rate),
+        duration: Number(shift.duration),
+        earnings: Number(shift.earnings),
+        isPaid: shift.is_paid,
+        createdAt: shift.created_at,
+        updatedAt: shift.updated_at,
+      }));
+
+      setShifts(transformedShifts);
+    } catch (error) {
+      console.error('Error loading shifts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadSettings = () => {
+    try {
+      const storedSettings = localStorage.getItem(SETTINGS_KEY);
       if (storedSettings) {
         setSettings(JSON.parse(storedSettings));
       }
     } catch (error) {
-      console.error('Error loading data from localStorage:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error loading settings:', error);
     }
-  }, []);
-
-  // Save shifts to localStorage whenever shifts change
-  useEffect(() => {
-    if (!loading) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(shifts));
-    }
-  }, [shifts, loading]);
+  };
 
   // Save settings to localStorage whenever settings change
   useEffect(() => {
-    if (!loading) {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-    }
-  }, [settings, loading]);
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }, [settings]);
 
   const calculateDuration = (startTime: string, endTime: string): number => {
     const start = new Date(`2000-01-01T${startTime}`);
@@ -63,43 +88,157 @@ export const useShifts = () => {
     return (end.getTime() - start.getTime()) / (1000 * 60 * 60);
   };
 
-  const addShift = (shiftData: ShiftFormData): Shift => {
+  const addShift = async (shiftData: ShiftFormData): Promise<Shift> => {
     const duration = calculateDuration(shiftData.startTime, shiftData.endTime);
     const earnings = duration * shiftData.hourlyRate;
     
-    const newShift: Shift = {
-      id: crypto.randomUUID(),
-      ...shiftData,
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User must be logged in to add shifts');
+    }
+
+    const shiftToInsert = {
+      user_id: user.id,
+      date: shiftData.date,
+      start_time: shiftData.startTime,
+      end_time: shiftData.endTime,
+      client_name: shiftData.clientName,
+      location: shiftData.location,
+      hourly_rate: shiftData.hourlyRate,
       duration,
       earnings,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      is_paid: shiftData.isPaid,
     };
 
-    setShifts(prev => [...prev, newShift]);
+    const { data, error } = await supabase
+      .from('shifts')
+      .insert([shiftToInsert])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding shift:', error);
+      throw new Error('Failed to add shift');
+    }
+
+    const newShift: Shift = {
+      id: data.id,
+      date: data.date,
+      startTime: data.start_time,
+      endTime: data.end_time,
+      clientName: data.client_name,
+      location: data.location,
+      hourlyRate: Number(data.hourly_rate),
+      duration: Number(data.duration),
+      earnings: Number(data.earnings),
+      isPaid: data.is_paid,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+
+    // Update local state
+    setShifts(prev => [newShift, ...prev]);
     return newShift;
   };
 
-  const addMultipleShifts = (shiftsData: ShiftFormData[]): Shift[] => {
-    const newShifts = shiftsData.map(shiftData => {
+  const addMultipleShifts = async (shiftsData: ShiftFormData[]): Promise<Shift[]> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User must be logged in to add shifts');
+    }
+
+    const shiftsToInsert = shiftsData.map(shiftData => {
       const duration = calculateDuration(shiftData.startTime, shiftData.endTime);
       const earnings = duration * shiftData.hourlyRate;
       
       return {
-        id: crypto.randomUUID(),
-        ...shiftData,
+        user_id: user.id,
+        date: shiftData.date,
+        start_time: shiftData.startTime,
+        end_time: shiftData.endTime,
+        client_name: shiftData.clientName,
+        location: shiftData.location,
+        hourly_rate: shiftData.hourlyRate,
         duration,
         earnings,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        is_paid: shiftData.isPaid,
       };
     });
 
-    setShifts(prev => [...prev, ...newShifts]);
+    const { data, error } = await supabase
+      .from('shifts')
+      .insert(shiftsToInsert)
+      .select();
+
+    if (error) {
+      console.error('Error adding multiple shifts:', error);
+      throw new Error('Failed to add shifts');
+    }
+
+    const newShifts: Shift[] = (data || []).map(shift => ({
+      id: shift.id,
+      date: shift.date,
+      startTime: shift.start_time,
+      endTime: shift.end_time,
+      clientName: shift.client_name,
+      location: shift.location,
+      hourlyRate: Number(shift.hourly_rate),
+      duration: Number(shift.duration),
+      earnings: Number(shift.earnings),
+      isPaid: shift.is_paid,
+      createdAt: shift.created_at,
+      updatedAt: shift.updated_at,
+    }));
+
+    // Update local state
+    setShifts(prev => [...newShifts, ...prev]);
     return newShifts;
   };
 
-  const updateShift = (id: string, updates: Partial<ShiftFormData>): boolean => {
+  const updateShift = async (id: string, updates: Partial<ShiftFormData>): Promise<boolean> => {
+    const updatedData: any = { ...updates };
+    
+    // Convert field names to database format
+    if (updates.startTime) updatedData.start_time = updates.startTime;
+    if (updates.endTime) updatedData.end_time = updates.endTime;
+    if (updates.clientName) updatedData.client_name = updates.clientName;
+    if (updates.hourlyRate !== undefined) updatedData.hourly_rate = updates.hourlyRate;
+    if (updates.isPaid !== undefined) updatedData.is_paid = updates.isPaid;
+
+    // Recalculate duration and earnings if time or rate changed
+    if (updates.startTime || updates.endTime || updates.hourlyRate) {
+      const currentShift = shifts.find(s => s.id === id);
+      if (currentShift) {
+        const startTime = updates.startTime || currentShift.startTime;
+        const endTime = updates.endTime || currentShift.endTime;
+        const hourlyRate = updates.hourlyRate || currentShift.hourlyRate;
+        
+        const duration = calculateDuration(startTime, endTime);
+        const earnings = duration * hourlyRate;
+        
+        updatedData.duration = duration;
+        updatedData.earnings = earnings;
+      }
+    }
+
+    // Remove frontend field names
+    delete updatedData.startTime;
+    delete updatedData.endTime;
+    delete updatedData.clientName;
+    delete updatedData.hourlyRate;
+    delete updatedData.isPaid;
+
+    const { error } = await supabase
+      .from('shifts')
+      .update(updatedData)
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating shift:', error);
+      return false;
+    }
+
+    // Update local state
     setShifts(prev => prev.map(shift => {
       if (shift.id === id) {
         const updatedShift = { ...shift, ...updates };
@@ -118,15 +257,27 @@ export const useShifts = () => {
       }
       return shift;
     }));
+    
     return true;
   };
 
-  const deleteShift = (id: string): boolean => {
+  const deleteShift = async (id: string): Promise<boolean> => {
+    const { error } = await supabase
+      .from('shifts')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting shift:', error);
+      return false;
+    }
+
+    // Update local state
     setShifts(prev => prev.filter(shift => shift.id !== id));
     return true;
   };
 
-  const markShiftAsPaid = (id: string): boolean => {
+  const markShiftAsPaid = async (id: string): Promise<boolean> => {
     return updateShift(id, { isPaid: true });
   };
 

@@ -14,9 +14,9 @@ const AddShift = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('manual');
 
-  const handleManualSubmit = (data: ShiftFormData) => {
+  const handleManualSubmit = async (data: ShiftFormData) => {
     try {
-      const newShift = addShift(data);
+      const newShift = await addShift(data);
       
       toast({
         title: "Shift added successfully",

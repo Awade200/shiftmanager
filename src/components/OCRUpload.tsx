@@ -111,7 +111,7 @@ const OCRUpload = () => {
     setExtractedShifts(prev => prev.filter((_, i) => i !== index));
   };
 
-  const saveAllShifts = () => {
+  const saveAllShifts = async () => {
     if (extractedShifts.length === 0) return;
 
     const shiftsToSave: ShiftFormData[] = extractedShifts.map(shift => ({
@@ -125,7 +125,7 @@ const OCRUpload = () => {
     }));
 
     try {
-      const savedShifts = addMultipleShifts(shiftsToSave);
+      const savedShifts = await addMultipleShifts(shiftsToSave);
       
       toast({
         title: "Shifts saved successfully",
