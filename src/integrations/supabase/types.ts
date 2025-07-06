@@ -82,6 +82,30 @@ export type Database = {
           },
         ]
       }
+      client_profiles: {
+        Row: {
+          client_name: string
+          created_at: string
+          default_location: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          client_name: string
+          created_at?: string
+          default_location: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          client_name?: string
+          created_at?: string
+          default_location?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       finished_product_locations: {
         Row: {
           created_at: string
