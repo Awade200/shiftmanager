@@ -71,7 +71,7 @@ const OCRUpload = () => {
     } catch (error) {
       toast({
         title: "Extraction failed",
-        description: error instanceof Error ? error.message : "Failed to process the image",
+        description: "OCR extraction failed. Please use manual entry to add your shifts instead.",
         variant: "destructive",
       });
     }
@@ -169,7 +169,10 @@ const OCRUpload = () => {
               {loading ? 'Processing image...' : 'Drop your rota here or click to browse'}
             </h3>
             <p className="text-muted-foreground mb-4">
-              Supports JPG, PNG, and PDF files up to 10MB
+              Supports JPG, PNG, and PDF files up to 10MB<br />
+              <span className="text-xs text-muted-foreground">
+                Having trouble with extraction? Try the Manual Entry tab instead.
+              </span>
             </p>
             
             {loading ? (
