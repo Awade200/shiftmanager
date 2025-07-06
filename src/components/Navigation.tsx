@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Home, Plus, Calendar, Clock } from 'lucide-react';
+import { Home, Plus, Calendar, Clock, Clipboard } from 'lucide-react';
 
 const Navigation = () => {
   const location = useLocation();
@@ -9,6 +9,7 @@ const Navigation = () => {
     { path: '/', label: 'Dashboard', icon: Home },
     { path: '/todays-shifts', label: 'Today', icon: Clock },
     { path: '/add-shift', label: 'Add Shift', icon: Plus },
+    { path: '/paste-shifts', label: 'Paste Shifts', icon: Clipboard },
     { path: '/all-shifts', label: 'All Shifts', icon: Calendar },
   ];
 
