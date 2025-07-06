@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { ShiftFormData } from '@/types/shift';
 import { useShifts } from '@/hooks/useShifts';
+import { useClientProfiles } from '@/hooks/useClientProfiles';
+import { useToast } from '@/hooks/use-toast';
+import { AlertCircle } from 'lucide-react';
 
 interface ShiftFormProps {
   onSubmit: (data: ShiftFormData) => void;
@@ -15,6 +18,8 @@ interface ShiftFormProps {
 
 const ShiftForm = ({ onSubmit, initialData, submitLabel = "Add Shift" }: ShiftFormProps) => {
   const { settings } = useShifts();
+  const { findClientLocation, saveClientProfile } = useClientProfiles();
+  const { toast } = useToast();
   
   const [formData, setFormData] = useState<ShiftFormData>({
     date: initialData?.date || new Date().toISOString().split('T')[0],
@@ -27,6 +32,7 @@ const ShiftForm = ({ onSubmit, initialData, submitLabel = "Add Shift" }: ShiftFo
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showLocationAlert, setShowLocationAlert] = useState(false);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -70,10 +76,15 @@ const ShiftForm = ({ onSubmit, initialData, submitLabel = "Add Shift" }: ShiftFo
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (validateForm()) {
+      // Save client-location mapping if auto-save is enabled and location is provided
+      if (settings.autoSaveClientLocations && formData.clientName && formData.location) {
+        await saveClientProfile(formData.clientName, formData.location);
+      }
+      
       onSubmit(formData);
     }
   };
@@ -84,6 +95,22 @@ const ShiftForm = ({ onSubmit, initialData, submitLabel = "Add Shift" }: ShiftFo
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+
+    // Handle client name change - check for existing location
+    if (field === 'clientName' && typeof value === 'string' && value.trim()) {
+      const existingLocation = findClientLocation(value.trim());
+      if (existingLocation) {
+        setFormData(prev => ({ ...prev, location: existingLocation }));
+        setShowLocationAlert(false);
+        toast({
+          title: "Location auto-filled",
+          description: `Found location "${existingLocation}" for ${value}`,
+        });
+      } else {
+        setShowLocationAlert(true);
+        setFormData(prev => ({ ...prev, location: '' }));
+      }
     }
   };
 
@@ -122,13 +149,20 @@ const ShiftForm = ({ onSubmit, initialData, submitLabel = "Add Shift" }: ShiftFo
           </div>
 
           <div>
-            <Label htmlFor="location">Location (Optional)</Label>
+            <Label htmlFor="location">Location {showLocationAlert ? '*' : '(Optional)'}</Label>
+            {showLocationAlert && (
+              <div className="flex items-center gap-2 mb-2 p-2 bg-accent/20 border border-accent/30 rounded-md">
+                <AlertCircle className="w-4 h-4 text-accent" />
+                <span className="text-sm text-accent">No location found for this client. Please enter location to save for future use.</span>
+              </div>
+            )}
             <Input
               id="location"
               type="text"
               placeholder="Additional location details"
               value={formData.location}
               onChange={(e) => handleChange('location', e.target.value)}
+              className={showLocationAlert && !formData.location ? 'border-accent' : ''}
             />
           </div>
 

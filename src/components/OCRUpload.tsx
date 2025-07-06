@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useOCR } from '@/hooks/useOCR';
 import { useShifts } from '@/hooks/useShifts';
+import { useClientProfiles } from '@/hooks/useClientProfiles';
 import { OCRResult, ShiftFormData } from '@/types/shift';
 import { Upload, FileImage, AlertCircle, CheckCircle, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -13,6 +14,7 @@ import { Label } from '@/components/ui/label';
 const OCRUpload = () => {
   const { extractShiftsFromImage, loading, progress } = useOCR();
   const { addMultipleShifts, settings } = useShifts();
+  const { findClientLocation, saveClientProfile } = useClientProfiles();
   const { toast } = useToast();
   
   const [extractedShifts, setExtractedShifts] = useState<(OCRResult & { hourlyRate: number; isPaid: boolean })[]>([]);
@@ -55,12 +57,16 @@ const OCRUpload = () => {
         return;
       }
 
-      // Add default values for hourly rate and payment status
-      const shiftsWithDefaults = results.map(shift => ({
-        ...shift,
-        hourlyRate: settings.defaultHourlyRate,
-        isPaid: false,
-      }));
+      // Add default values and check for existing client locations
+      const shiftsWithDefaults = results.map(shift => {
+        const existingLocation = findClientLocation(shift.clientName);
+        return {
+          ...shift,
+          location: existingLocation || shift.location || '',
+          hourlyRate: settings.defaultHourlyRate,
+          isPaid: false,
+        };
+      });
 
       setExtractedShifts(shiftsWithDefaults);
       
@@ -125,6 +131,15 @@ const OCRUpload = () => {
     }));
 
     try {
+      // Save client-location mappings if auto-save is enabled
+      if (settings.autoSaveClientLocations) {
+        for (const shift of extractedShifts) {
+          if (shift.clientName && shift.location) {
+            await saveClientProfile(shift.clientName, shift.location);
+          }
+        }
+      }
+
       const savedShifts = await addMultipleShifts(shiftsToSave);
       
       toast({

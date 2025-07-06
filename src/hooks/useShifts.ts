@@ -6,10 +6,12 @@ const SETTINGS_KEY = 'shift-manager-settings';
 
 interface Settings {
   defaultHourlyRate: number;
+  autoSaveClientLocations: boolean;
 }
 
 const defaultSettings: Settings = {
-  defaultHourlyRate: 12.00
+  defaultHourlyRate: 12.00,
+  autoSaveClientLocations: true
 };
 
 export const useShifts = () => {
