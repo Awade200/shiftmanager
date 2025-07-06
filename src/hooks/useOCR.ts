@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import Tesseract from 'tesseract.js';
-import pdf from 'pdf-parse';
+import * as pdfjsLib from 'pdfjs-dist';
 import { OCRResult } from '@/types/shift';
+
+// Set the worker path for PDF.js
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
 
 export const useOCR = () => {
   const [loading, setLoading] = useState(false);
@@ -18,9 +21,20 @@ export const useOCR = () => {
       if (file.type === 'application/pdf') {
         console.log('Processing PDF file with text extraction...');
         const arrayBuffer = await file.arrayBuffer();
-        const pdfData = await pdf(arrayBuffer);
-        text = pdfData.text;
-        setProgress(100);
+        const loadingTask = pdfjsLib.getDocument(arrayBuffer);
+        const pdf = await loadingTask.promise;
+        
+        let text = '';
+        const numPages = pdf.numPages;
+        
+        for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+          const page = await pdf.getPage(pageNum);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map((item: any) => item.str).join(' ');
+          text += pageText + '\n';
+          setProgress(Math.round((pageNum / numPages) * 100));
+        }
+        
         console.log('PDF text extracted:', text);
       } else {
         console.log('Processing image file with OCR...');
