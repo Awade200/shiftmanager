@@ -18,7 +18,8 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AuthWrapper>
+        {/* AuthWrapper temporarily disabled for development */}
+        {/* <AuthWrapper> */}
           <div className="min-h-screen bg-background">
             <Navigation />
             <main>
@@ -31,7 +32,7 @@ const App = () => (
               </Routes>
             </main>
           </div>
-        </AuthWrapper>
+        {/* </AuthWrapper> */}
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

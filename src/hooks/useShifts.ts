@@ -92,13 +92,16 @@ export const useShifts = () => {
     const duration = calculateDuration(shiftData.startTime, shiftData.endTime);
     const earnings = duration * shiftData.hourlyRate;
     
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('User must be logged in to add shifts');
-    }
+    // Temporarily bypass authentication for development
+    const mockUserId = '00000000-0000-0000-0000-000000000000';
+    
+    // const { data: { user } } = await supabase.auth.getUser();
+    // if (!user) {
+    //   throw new Error('User must be logged in to add shifts');
+    // }
 
     const shiftToInsert = {
-      user_id: user.id,
+      user_id: mockUserId, // user.id,
       date: shiftData.date,
       start_time: shiftData.startTime,
       end_time: shiftData.endTime,
@@ -142,17 +145,20 @@ export const useShifts = () => {
   };
 
   const addMultipleShifts = async (shiftsData: ShiftFormData[]): Promise<Shift[]> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('User must be logged in to add shifts');
-    }
+    // Temporarily bypass authentication for development
+    const mockUserId = '00000000-0000-0000-0000-000000000000';
+    
+    // const { data: { user } } = await supabase.auth.getUser();
+    // if (!user) {
+    //   throw new Error('User must be logged in to add shifts');
+    // }
 
     const shiftsToInsert = shiftsData.map(shiftData => {
       const duration = calculateDuration(shiftData.startTime, shiftData.endTime);
       const earnings = duration * shiftData.hourlyRate;
       
       return {
-        user_id: user.id,
+        user_id: mockUserId, // user.id,
         date: shiftData.date,
         start_time: shiftData.startTime,
         end_time: shiftData.endTime,
