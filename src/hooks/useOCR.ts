@@ -117,52 +117,103 @@ export const useOCR = () => {
     const shifts: OCRResult[] = [];
     const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     
-    for (let i = 0; i < lines.length - 2; i++) {
-      const currentLine = lines[i];
-      const nextLine = lines[i + 1];
-      const thirdLine = lines[i + 2];
+    console.log('Parsing timesheet format with lines:', lines);
+    
+    // New approach: Look for patterns in the extracted text
+    // Pattern 1: "Monday CD1795 Supported Living Day Shift 12.00"
+    // Pattern 2: "30/06/2025 James Gladstone 08:00 - 20:00"
+    // Pattern 3: Multiple shifts can be on consecutive lines
+    
+    let currentDate = '';
+    let currentService = '';
+    let currentQuantity = 0;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
       
-      // Look for pattern: Day + Client/Code + Service + Quantity on one line
-      // followed by Date + Name on next line
-      // followed by Time range on third line
+      // Check for day + service pattern
+      const dayServiceMatch = line.match(/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+([A-Z0-9]+)\s+(.+?)\s+(\d+\.?\d*)$/i);
+      if (dayServiceMatch) {
+        const [, dayName, clientCode, serviceType, quantity] = dayServiceMatch;
+        currentService = serviceType.trim();
+        currentQuantity = parseFloat(quantity);
+        continue;
+      }
       
-      // Match pattern like: "Monday CD1795 Supported Living Day Shift 12.00"
-      const shiftHeaderMatch = currentLine.match(/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+([A-Z0-9]+)\s+(.+?)\s+(\d+\.?\d*)$/i);
-      
-      if (shiftHeaderMatch) {
-        const [, dayName, clientCode, serviceType, quantity] = shiftHeaderMatch;
+      // Check for date + name + time pattern: "30/06/2025 James Gladstone 08:00 - 20:00"
+      const fullEntryMatch = line.match(/^(\d{1,2}\/\d{1,2}\/\d{4})\s+(.+?)\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+      if (fullEntryMatch) {
+        const [, dateStr, clientName, startTime, endTime] = fullEntryMatch;
         
-        // Next line should have date and name: "30/06/2025 James Gladstone"
-        const dateNameMatch = nextLine.match(/^(\d{1,2}\/\d{1,2}\/\d{4})\s+(.+)$/);
-        
-        // Third line should have time range: "08:00 - 20:00"
-        const timeMatch = thirdLine.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
-        
-        if (dateNameMatch && timeMatch) {
-          const [, dateStr, clientName] = dateNameMatch;
-          const [, startTime, endTime] = timeMatch;
+        try {
+          const shift: OCRResult = {
+            date: convertDateFormat(dateStr),
+            startTime: normalizeTimeString(startTime),
+            endTime: normalizeTimeString(endTime),
+            clientName: clientName.trim(),
+            location: currentService || 'Unknown Service',
+            serviceType: currentService || 'Unknown Service',
+            duration: currentQuantity || calculateDurationFromTimes(startTime, endTime)
+          };
           
-          try {
-            const shift: OCRResult = {
-              date: convertDateFormat(dateStr),
-              startTime: normalizeTimeString(startTime),
-              endTime: normalizeTimeString(endTime),
-              clientName: clientName.trim(),
-              location: serviceType.trim(),
-              serviceType: serviceType.trim(),
-              duration: parseFloat(quantity)
-            };
+          shifts.push(shift);
+          console.log('Added shift:', shift);
+        } catch (error) {
+          console.log('Error parsing full entry:', error);
+        }
+        continue;
+      }
+      
+      // Check for separate date line
+      const dateMatch = line.match(/^(\d{1,2}\/\d{1,2}\/\d{4})\s+(.+)$/);
+      if (dateMatch) {
+        const [, dateStr, clientName] = dateMatch;
+        currentDate = dateStr;
+        
+        // Look ahead for time on next line
+        if (i + 1 < lines.length) {
+          const nextLine = lines[i + 1];
+          const timeMatch = nextLine.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+          
+          if (timeMatch) {
+            const [, startTime, endTime] = timeMatch;
             
-            shifts.push(shift);
-            i += 2; // Skip the lines we just processed
-          } catch (error) {
-            console.log('Error parsing timesheet entry:', error);
+            try {
+              const shift: OCRResult = {
+                date: convertDateFormat(currentDate),
+                startTime: normalizeTimeString(startTime),
+                endTime: normalizeTimeString(endTime),
+                clientName: clientName.trim(),
+                location: currentService || 'Unknown Service',
+                serviceType: currentService || 'Unknown Service',
+                duration: currentQuantity || calculateDurationFromTimes(startTime, endTime)
+              };
+              
+              shifts.push(shift);
+              console.log('Added shift from separate lines:', shift);
+              i++; // Skip the time line
+            } catch (error) {
+              console.log('Error parsing separate lines:', error);
+            }
           }
         }
       }
     }
     
+    console.log('Parsed shifts:', shifts);
     return shifts;
+  };
+
+  const calculateDurationFromTimes = (startTime: string, endTime: string): number => {
+    const start = new Date(`2000-01-01T${startTime}`);
+    const end = new Date(`2000-01-01T${endTime}`);
+    
+    if (end < start) {
+      // Handle overnight shifts
+      end.setDate(end.getDate() + 1);
+    }
+    
+    return (end.getTime() - start.getTime()) / (1000 * 60 * 60);
   };
 
   const parseRotaBlock = (block: string): OCRResult | null => {
