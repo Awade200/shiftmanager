@@ -10,6 +10,7 @@ import AddShift from "./pages/AddShift";
 import AllShifts from "./pages/AllShifts";
 import TodaysShifts from "./pages/TodaysShifts";
 import PasteShifts from "./pages/PasteShifts";
+import GroupedShifts from "./pages/GroupedShifts";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -33,6 +34,7 @@ const App = () => (
           <Route path="/all-shifts" element={<AllShifts />} />
           <Route path="/todays-shifts" element={<TodaysShifts />} />
           <Route path="/paste-shifts" element={<PasteShifts />} />
+          <Route path="/grouped-shifts" element={<GroupedShifts />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
