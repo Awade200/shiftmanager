@@ -10,6 +10,7 @@ import AddShift from "./pages/AddShift";
 import AllShifts from "./pages/AllShifts";
 import TodaysShifts from "./pages/TodaysShifts";
 import PasteShifts from "./pages/PasteShifts";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,15 +26,16 @@ const App = () => (
           <div className="min-h-screen bg-background">
             <Navigation />
             <main>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/add-shift" element={<AddShift />} />
-                <Route path="/all-shifts" element={<AllShifts />} />
-                <Route path="/todays-shifts" element={<TodaysShifts />} />
-                <Route path="/paste-shifts" element={<PasteShifts />} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/add-shift" element={<AddShift />} />
+          <Route path="/all-shifts" element={<AllShifts />} />
+          <Route path="/todays-shifts" element={<TodaysShifts />} />
+          <Route path="/paste-shifts" element={<PasteShifts />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
             </main>
           </div>
         {/* </AuthWrapper> */}

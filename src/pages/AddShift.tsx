@@ -4,23 +4,41 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ShiftForm from '@/components/ShiftForm';
 import OCRUpload from '@/components/OCRUpload';
 import { useShifts } from '@/hooks/useShifts';
+import { useClientProfiles } from '@/hooks/useClientProfiles';
+import { useNameAnonymization } from '@/hooks/useNameAnonymization';
 import { ShiftFormData } from '@/types/shift';
 import { useToast } from '@/hooks/use-toast';
 import { Edit, Upload } from 'lucide-react';
 
 const AddShift = () => {
   const navigate = useNavigate();
-  const { addShift } = useShifts();
+  const { addShift, settings } = useShifts();
+  const { saveClientProfile } = useClientProfiles();
+  const { anonymizeName } = useNameAnonymization();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('manual');
 
   const handleManualSubmit = async (data: ShiftFormData) => {
     try {
-      const newShift = await addShift(data);
+      // Store original name for client profile mapping
+      const originalClientName = data.clientName;
+      
+      // Anonymize the client name for display and storage
+      const anonymizedData = {
+        ...data,
+        clientName: anonymizeName(originalClientName)
+      };
+      
+      const newShift = await addShift(anonymizedData);
+      
+      // Save client-location mapping using original name
+      if (data.location && settings.autoSaveClientLocations) {
+        await saveClientProfile(originalClientName, data.location);
+      }
       
       toast({
         title: "Shift added successfully",
-        description: `Added shift for ${newShift.clientName} on ${new Date(newShift.date).toLocaleDateString()}`,
+        description: `Added shift for ${anonymizedData.clientName} on ${new Date(newShift.date).toLocaleDateString()}`,
       });
 
       navigate('/');

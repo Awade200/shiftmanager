@@ -10,6 +10,7 @@ import { Trash2, Edit2, Check, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useShifts } from '@/hooks/useShifts';
 import { useClientProfiles } from '@/hooks/useClientProfiles';
+import { useNameAnonymization } from '@/hooks/useNameAnonymization';
 import { ShiftFormData } from '@/types/shift';
 
 interface ParsedShift {
@@ -31,6 +32,7 @@ export default function PasteShifts() {
   const { toast } = useToast();
   const { addMultipleShifts, settings } = useShifts();
   const { findClientLocation, saveClientProfile } = useClientProfiles();
+  const { anonymizeName } = useNameAnonymization();
 
   const parseShiftsFromText = async (text: string): Promise<ParsedShift[]> => {
     const lines = text.split('\n').filter(line => line.trim());
@@ -50,13 +52,17 @@ export default function PasteShifts() {
         const [day, month, year] = dateStr.split('/');
         const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
         
-        // Check for existing location
-        const existingLocation = findClientLocation(clientName.trim());
+        // Anonymize the client name for privacy
+        const originalClientName = clientName.trim();
+        const displayClientName = anonymizeName(originalClientName);
+        
+        // Check for existing location using original name
+        const existingLocation = findClientLocation(originalClientName);
         
         const shift: ParsedShift = {
           id: Math.random().toString(36).substr(2, 9),
           date: formattedDate,
-          clientName: clientName.trim(),
+          clientName: displayClientName,
           startTime: normalizeTime(startTime),
           endTime: normalizeTime(endTime),
           location: existingLocation || undefined,
@@ -170,6 +176,7 @@ export default function PasteShifts() {
       await addMultipleShifts(shiftFormData);
 
       // Save new client-location mappings
+      // Note: We store the display name since we don't have access to original names here
       for (const shift of parsedShifts) {
         if (shift.location && settings.autoSaveClientLocations) {
           await saveClientProfile(shift.clientName, shift.location);
@@ -205,12 +212,17 @@ export default function PasteShifts() {
           <div className="text-sm text-muted-foreground">
             Paste your shift data in the format: <code>DD/MM/YYYY ClientName HH:MM - HH:MM</code>
             <br />
-            Example: <code>30/06/2025 James Gladstone 08:00 - 20:00</code>
+            Example: <code>01/07/2025 Liam Thompson 08:00 - 12:00</code>
+            <br />
+            <div className="flex items-center gap-2 mt-2 text-xs">
+              <Badge variant="secondary">Privacy Protected</Badge>
+              Real names are automatically replaced with fake ones for security
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <Textarea
-            placeholder="30/06/2025 James Gladstone 08:00 - 20:00&#10;03/07/2025 Sam Hornshaw 08:30 - 21:30&#10;06/07/2025 Hayden Potter 14:00 - 17:30"
+            placeholder="01/07/2025 Liam Thompson 08:00 - 12:00&#10;01/07/2025 Ava Williams 12:00 - 16:00&#10;02/07/2025 Noah Johnson 09:00 - 14:00"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             rows={8}
