@@ -37,16 +37,23 @@ export default function PasteShifts() {
   const parseShiftsFromText = async (text: string): Promise<ParsedShift[]> => {
     const lines = text.split('\n').filter(line => line.trim());
     const shifts: ParsedShift[] = [];
+    const originalNameMapping = new Map<string, string>(); // displayName -> originalName
 
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed) continue;
 
-      // Pattern: DD/MM/YYYY ClientName HH:MM - HH:MM
+      // Strict pattern: DD/MM/YYYY ClientName HH:MM - HH:MM (must use hyphen, not en dash)
+      // More flexible with client name to handle multiple words
       const match = trimmed.match(/^(\d{1,2}\/\d{1,2}\/\d{4})\s+(.+?)\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
       
       if (match) {
         const [, dateStr, clientName, startTime, endTime] = match;
+        
+        // Validate time format is strict HH:MM
+        if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) {
+          continue; // Skip invalid time formats
+        }
         
         // Convert date format from DD/MM/YYYY to YYYY-MM-DD
         const [day, month, year] = dateStr.split('/');
@@ -55,6 +62,9 @@ export default function PasteShifts() {
         // Anonymize the client name for privacy
         const originalClientName = clientName.trim();
         const displayClientName = anonymizeName(originalClientName);
+        
+        // Store mapping for later use
+        originalNameMapping.set(displayClientName, originalClientName);
         
         // Check for existing location using original name
         const existingLocation = findClientLocation(originalClientName);
@@ -75,6 +85,9 @@ export default function PasteShifts() {
       }
     }
 
+    // Store the original name mappings for use in save function
+    (parseShiftsFromText as any).originalNameMapping = originalNameMapping;
+    
     return shifts;
   };
 
@@ -175,11 +188,13 @@ export default function PasteShifts() {
 
       await addMultipleShifts(shiftFormData);
 
-      // Save new client-location mappings
-      // Note: We store the display name since we don't have access to original names here
+      // Save new client-location mappings using original names
+      const originalNameMapping = (parseShiftsFromText as any).originalNameMapping as Map<string, string>;
       for (const shift of parsedShifts) {
         if (shift.location && settings.autoSaveClientLocations) {
-          await saveClientProfile(shift.clientName, shift.location);
+          // Use original name for storing the client profile mapping
+          const originalName = originalNameMapping.get(shift.clientName) || shift.clientName;
+          await saveClientProfile(originalName, shift.location);
         }
       }
 
@@ -212,11 +227,17 @@ export default function PasteShifts() {
           <div className="text-sm text-muted-foreground">
             Paste your shift data in the format: <code>DD/MM/YYYY ClientName HH:MM - HH:MM</code>
             <br />
+            <strong>Requirements:</strong> Use strict time format (e.g., 08:00 not 8:00) and hyphen (-) not en dash (–)
+            <br />
             Example: <code>01/07/2025 Liam Thompson 08:00 - 12:00</code>
             <br />
             <div className="flex items-center gap-2 mt-2 text-xs">
               <Badge variant="secondary">Privacy Protected</Badge>
               Real names are automatically replaced with fake ones for security
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-xs">
+              <Badge variant="outline">Smart Location Mapping</Badge>
+              Known clients auto-fill locations; unknown ones are flagged for manual entry
             </div>
           </div>
         </CardHeader>
