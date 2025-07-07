@@ -56,7 +56,7 @@ export default function GroupedShifts() {
         shift.date.includes(dateFilter)
       );
     }
-    if (locationFilter) {
+    if (locationFilter && locationFilter !== 'all') {
       filteredShifts = filteredShifts.filter(shift => 
         shift.location === locationFilter
       );
@@ -173,7 +173,7 @@ export default function GroupedShifts() {
                   <SelectValue placeholder="All houses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All houses</SelectItem>
+                  <SelectItem value="all">All houses</SelectItem>
                   {uniqueLocations.map(location => (
                     <SelectItem key={location} value={location}>
                       {location}
