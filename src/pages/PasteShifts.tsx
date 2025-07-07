@@ -52,6 +52,7 @@ export default function PasteShifts() {
         
         // Validate time format is strict HH:MM
         if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) {
+          console.warn(`Skipping invalid time format: ${startTime} - ${endTime}`);
           continue; // Skip invalid time formats
         }
         
@@ -82,6 +83,9 @@ export default function PasteShifts() {
         };
         
         shifts.push(shift);
+        console.log(`Extracted shift: ${formattedDate} ${displayClientName} ${startTime}-${endTime}`);
+      } else {
+        console.warn(`Failed to parse line: ${trimmed}`);
       }
     }
 
@@ -268,6 +272,27 @@ export default function PasteShifts() {
                 Save All Shifts
               </Button>
             </CardTitle>
+            {/* Shift Preview Summary */}
+            <div className="bg-muted/50 rounded-lg p-4 mb-4">
+              <h4 className="font-medium mb-2">Preview of Extracted Shifts:</h4>
+              <div className="space-y-1 text-sm font-mono">
+                {parsedShifts.map((shift, index) => (
+                  <div key={shift.id} className="flex items-center gap-2">
+                    <span className="text-green-600">✓</span>
+                    <span>{new Date(shift.date).toLocaleDateString('en-GB')}</span>
+                    <span>–</span>
+                    <span className="font-medium">{shift.clientName}</span>
+                    <span>–</span>
+                    <span>{shift.startTime}–{shift.endTime}</span>
+                    <span>–</span>
+                    <span className={shift.needsLocation ? "text-destructive" : "text-muted-foreground"}>
+                      {shift.location || "Location needed"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
             {parsedShifts.some(shift => shift.needsLocation) && (
               <Alert>
                 <AlertDescription>
