@@ -168,9 +168,13 @@ export default function PasteShifts() {
   };
 
   const handleSaveShifts = async () => {
+    console.log('🔄 Starting save process...');
+    console.log('📊 Parsed shifts:', parsedShifts);
+    
     const shiftsWithMissingLocations = parsedShifts.filter(shift => shift.needsLocation);
     
     if (shiftsWithMissingLocations.length > 0) {
+      console.log('❌ Missing locations found:', shiftsWithMissingLocations);
       toast({
         title: "Missing locations",
         description: `${shiftsWithMissingLocations.length} shifts need locations. Please fill them in first.`,
@@ -179,8 +183,20 @@ export default function PasteShifts() {
       return;
     }
 
-    try {
-      const shiftFormData: ShiftFormData[] = parsedShifts.map(shift => ({
+    // Validate shifts before saving
+    const invalidShifts: string[] = [];
+    const shiftFormData: ShiftFormData[] = parsedShifts.map((shift, index) => {
+      // Check for missing or invalid client names
+      if (!shift.clientName || shift.clientName.trim().length === 0) {
+        invalidShifts.push(`Shift ${index + 1} on ${shift.date}: Missing client name`);
+      }
+      
+      // Check for missing location
+      if (!shift.location || shift.location.trim().length === 0) {
+        invalidShifts.push(`Shift ${index + 1} on ${shift.date}: Missing location`);
+      }
+
+      return {
         date: shift.date,
         startTime: shift.startTime,
         endTime: shift.endTime,
@@ -188,20 +204,39 @@ export default function PasteShifts() {
         location: shift.location!,
         hourlyRate: shift.hourlyRate,
         isPaid: false
-      }));
+      };
+    });
 
-      await addMultipleShifts(shiftFormData);
+    if (invalidShifts.length > 0) {
+      console.log('❌ Validation errors:', invalidShifts);
+      toast({
+        title: "Validation errors",
+        description: invalidShifts.join('. '),
+        variant: "destructive"
+      });
+      return;
+    }
+
+    console.log('📤 Sending shift data to backend:', shiftFormData);
+
+    try {
+      const savedShifts = await addMultipleShifts(shiftFormData);
+      console.log('✅ Backend response - saved shifts:', savedShifts);
 
       // Save new client-location mappings using original names
       const originalNameMapping = (parseShiftsFromText as any).originalNameMapping as Map<string, string>;
+      console.log('🗺️ Original name mapping:', Array.from(originalNameMapping.entries()));
+      
       for (const shift of parsedShifts) {
         if (shift.location && settings.autoSaveClientLocations) {
           // Use original name for storing the client profile mapping
           const originalName = originalNameMapping.get(shift.clientName) || shift.clientName;
+          console.log(`💾 Saving client profile: ${originalName} -> ${shift.location}`);
           await saveClientProfile(originalName, shift.location);
         }
       }
 
+      console.log('✅ All operations completed successfully');
       toast({
         title: "Shifts saved",
         description: `Successfully saved ${parsedShifts.length} shifts.`,
@@ -211,9 +246,26 @@ export default function PasteShifts() {
       setInputText('');
       setParsedShifts([]);
     } catch (error) {
+      console.error('❌ Save operation failed:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        errorObject: error
+      });
+      
+      // Check if shifts were actually saved despite the error
+      try {
+        console.log('🔍 Checking if shifts were saved despite error...');
+        // We could reload shifts here to verify if they were saved
+      } catch (checkError) {
+        console.error('❌ Failed to check shift status:', checkError);
+      }
+      
       toast({
         title: "Save failed",
-        description: "There was an error saving your shifts.",
+        description: error instanceof Error 
+          ? `Error: ${error.message}` 
+          : "There was an unknown error saving your shifts.",
         variant: "destructive"
       });
     }

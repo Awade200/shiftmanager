@@ -149,19 +149,24 @@ export const useShifts = () => {
   };
 
   const addMultipleShifts = async (shiftsData: ShiftFormData[]): Promise<Shift[]> => {
+    console.log('🚀 addMultipleShifts called with data:', shiftsData);
+    
     // Temporarily bypass authentication for development
     const mockUserId = '00000000-0000-0000-0000-000000000000';
+    console.log('👤 Using mock user ID:', mockUserId);
     
     // const { data: { user } } = await supabase.auth.getUser();
     // if (!user) {
     //   throw new Error('User must be logged in to add shifts');
     // }
 
-    const shiftsToInsert = shiftsData.map(shiftData => {
+    const shiftsToInsert = shiftsData.map((shiftData, index) => {
+      console.log(`📝 Processing shift ${index + 1}:`, shiftData);
+      
       const duration = calculateDuration(shiftData.startTime, shiftData.endTime);
       const earnings = duration * shiftData.hourlyRate;
       
-      return {
+      const insertData = {
         user_id: mockUserId, // user.id,
         date: shiftData.date,
         start_time: shiftData.startTime,
@@ -173,36 +178,78 @@ export const useShifts = () => {
         earnings,
         is_paid: shiftData.isPaid,
       };
+      
+      console.log(`✅ Prepared insert data for shift ${index + 1}:`, insertData);
+      return insertData;
     });
 
-    const { data, error } = await supabase
-      .from('shifts')
-      .insert(shiftsToInsert)
-      .select();
+    console.log('📊 Final shifts to insert:', shiftsToInsert);
 
-    if (error) {
-      console.error('Error adding multiple shifts:', error);
-      throw new Error('Failed to add shifts');
+    try {
+      console.log('🔄 Sending INSERT request to Supabase...');
+      const { data, error } = await supabase
+        .from('shifts')
+        .insert(shiftsToInsert)
+        .select();
+
+      console.log('📥 Supabase response - data:', data);
+      console.log('📥 Supabase response - error:', error);
+
+      if (error) {
+        console.error('❌ Database error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw new Error(`Database error: ${error.message}`);
+      }
+
+      if (!data || data.length === 0) {
+        console.error('❌ No data returned from insert operation');
+        throw new Error('No data returned from database insert');
+      }
+
+      console.log(`✅ Successfully inserted ${data.length} shifts`);
+
+      const newShifts: Shift[] = data.map((shift, index) => {
+        console.log(`🔄 Transforming shift ${index + 1} from DB format:`, shift);
+        
+        const transformedShift = {
+          id: shift.id,
+          date: shift.date,
+          startTime: shift.start_time,
+          endTime: shift.end_time,
+          clientName: shift.client_name,
+          location: shift.location,
+          hourlyRate: Number(shift.hourly_rate),
+          duration: Number(shift.duration),
+          earnings: Number(shift.earnings),
+          isPaid: shift.is_paid,
+          createdAt: shift.created_at,
+          updatedAt: shift.updated_at,
+        };
+        
+        console.log(`✅ Transformed shift ${index + 1}:`, transformedShift);
+        return transformedShift;
+      });
+
+      console.log('📊 All transformed shifts:', newShifts);
+
+      // Update local state
+      console.log('🔄 Updating local state...');
+      setShifts(prev => {
+        const updatedShifts = [...newShifts, ...prev];
+        console.log('✅ Local state updated, new total:', updatedShifts.length);
+        return updatedShifts;
+      });
+      
+      console.log('🎉 addMultipleShifts completed successfully');
+      return newShifts;
+    } catch (dbError) {
+      console.error('❌ Database operation failed:', dbError);
+      throw dbError;
     }
-
-    const newShifts: Shift[] = (data || []).map(shift => ({
-      id: shift.id,
-      date: shift.date,
-      startTime: shift.start_time,
-      endTime: shift.end_time,
-      clientName: shift.client_name,
-      location: shift.location,
-      hourlyRate: Number(shift.hourly_rate),
-      duration: Number(shift.duration),
-      earnings: Number(shift.earnings),
-      isPaid: shift.is_paid,
-      createdAt: shift.created_at,
-      updatedAt: shift.updated_at,
-    }));
-
-    // Update local state
-    setShifts(prev => [...newShifts, ...prev]);
-    return newShifts;
   };
 
   const updateShift = async (id: string, updates: Partial<ShiftFormData>): Promise<boolean> => {
