@@ -8,8 +8,8 @@ export const useDuplicateHandling = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { findClientLocation } = useClientProfiles();
 
-  const generateShiftKey = (date: string, clientName: string): string => {
-    return `${date}_${clientName.toLowerCase().replace(/\s+/g, '_')}`;
+  const generateShiftKey = (date: string, startTime: string, endTime: string, clientName: string): string => {
+    return `${date}_${startTime}_${endTime}_${clientName.toLowerCase().replace(/\s+/g, '_')}`;
   };
 
   const calculateDuration = (startTime: string, endTime: string): number => {
@@ -30,7 +30,7 @@ export const useDuplicateHandling = () => {
       const results: DuplicateCheckResult[] = [];
 
       for (const newShift of newShifts) {
-        const shiftKey = generateShiftKey(newShift.date, newShift.clientName);
+        const shiftKey = generateShiftKey(newShift.date, newShift.startTime, newShift.endTime, newShift.clientName);
         
         // Check if shift already exists
         const { data: existingShifts, error } = await supabase
@@ -125,7 +125,7 @@ export const useDuplicateHandling = () => {
           duration,
           earnings,
           is_paid: false,
-          shift_key: generateShiftKey(result.newShift.date, result.newShift.clientName),
+          shift_key: generateShiftKey(result.newShift.date, result.newShift.startTime, result.newShift.endTime, result.newShift.clientName),
         });
         newShifts++;
         newHours += duration;
@@ -164,7 +164,7 @@ export const useDuplicateHandling = () => {
             duration,
             earnings,
             is_paid: false,
-            shift_key: generateShiftKey(result.newShift.date, result.newShift.clientName) + '_' + Date.now(),
+            shift_key: generateShiftKey(result.newShift.date, result.newShift.startTime, result.newShift.endTime, result.newShift.clientName) + '_' + Date.now(),
           });
           newShifts++;
           newHours += duration;
