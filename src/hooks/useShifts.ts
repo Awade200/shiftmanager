@@ -92,6 +92,10 @@ export const useShifts = () => {
     return (end.getTime() - start.getTime()) / (1000 * 60 * 60);
   };
 
+  const generateShiftKey = (date: string, clientName: string): string => {
+    return `${date}_${clientName.toLowerCase().replace(/\s+/g, '_')}`;
+  };
+
   const addShift = async (shiftData: ShiftFormData): Promise<Shift> => {
     const duration = calculateDuration(shiftData.startTime, shiftData.endTime);
     const earnings = duration * shiftData.hourlyRate;
@@ -115,6 +119,7 @@ export const useShifts = () => {
       duration,
       earnings,
       is_paid: shiftData.isPaid,
+      shift_key: generateShiftKey(shiftData.date, shiftData.clientName),
     };
 
     const { data, error } = await supabase
@@ -177,6 +182,7 @@ export const useShifts = () => {
         duration,
         earnings,
         is_paid: shiftData.isPaid,
+        shift_key: generateShiftKey(shiftData.date, shiftData.clientName),
       };
       
       console.log(`✅ Prepared insert data for shift ${index + 1}:`, insertData);

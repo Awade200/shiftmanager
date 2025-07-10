@@ -536,6 +536,7 @@ export type Database = {
           id: string
           is_paid: boolean
           location: string | null
+          shift_key: string
           start_time: string
           updated_at: string
           user_id: string
@@ -551,6 +552,7 @@ export type Database = {
           id?: string
           is_paid?: boolean
           location?: string | null
+          shift_key: string
           start_time: string
           updated_at?: string
           user_id: string
@@ -566,6 +568,7 @@ export type Database = {
           id?: string
           is_paid?: boolean
           location?: string | null
+          shift_key?: string
           start_time?: string
           updated_at?: string
           user_id?: string

@@ -5,19 +5,26 @@ import { Progress } from '@/components/ui/progress';
 import { useOCR } from '@/hooks/useOCR';
 import { useShifts } from '@/hooks/useShifts';
 import { useClientProfiles } from '@/hooks/useClientProfiles';
+import { useDuplicateHandling } from '@/hooks/useDuplicateHandling';
 import { OCRResult, ShiftFormData } from '@/types/shift';
+import { DuplicateCheckResult, UpdateChoice } from '@/types/duplicateHandling';
 import { Upload, FileImage, AlertCircle, CheckCircle, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import DuplicateHandlingModal from './DuplicateHandlingModal';
+import ShiftPreviewSummary from './ShiftPreviewSummary';
 
 const OCRUpload = () => {
   const { extractShiftsFromImage, loading, progress } = useOCR();
-  const { addMultipleShifts, settings } = useShifts();
+  const { settings } = useShifts();
   const { findClientLocation, saveClientProfile } = useClientProfiles();
+  const { checkForDuplicates, processShiftsWithChoices } = useDuplicateHandling();
   const { toast } = useToast();
   
   const [extractedShifts, setExtractedShifts] = useState<(OCRResult & { hourlyRate: number; isPaid: boolean })[]>([]);
+  const [duplicateResults, setDuplicateResults] = useState<DuplicateCheckResult[]>([]);
+  const [showConflictModal, setShowConflictModal] = useState(false);
   const [dragActive, setDragActive] = useState(false);
 
   const handleFiles = useCallback(async (files: FileList | null) => {
@@ -117,10 +124,10 @@ const OCRUpload = () => {
     setExtractedShifts(prev => prev.filter((_, i) => i !== index));
   };
 
-  const saveAllShifts = async () => {
+  const processOCRShifts = async () => {
     if (extractedShifts.length === 0) return;
 
-    const shiftsToSave: ShiftFormData[] = extractedShifts.map(shift => ({
+    const shiftFormData: ShiftFormData[] = extractedShifts.map(shift => ({
       date: shift.date,
       startTime: shift.startTime,
       endTime: shift.endTime,
@@ -131,7 +138,35 @@ const OCRUpload = () => {
     }));
 
     try {
-      // Save client-location mappings if auto-save is enabled
+      const results = await checkForDuplicates(shiftFormData);
+      setDuplicateResults(results);
+
+      const conflicts = results.filter(r => r.status === 'potential_update');
+      if (conflicts.length > 0) {
+        setShowConflictModal(true);
+        return;
+      }
+
+      // Process directly if no conflicts
+      await handleDirectSave(results);
+    } catch (error) {
+      toast({
+        title: "Processing failed",
+        description: "There was an error processing your shifts",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDirectSave = async (results: DuplicateCheckResult[]) => {
+    const defaultChoices: UpdateChoice[] = results.map(result => ({
+      shiftId: result.id,
+      action: 'update'
+    }));
+
+    try {
+      await processShiftsWithChoices(results, defaultChoices);
+      
       if (settings.autoSaveClientLocations) {
         for (const shift of extractedShifts) {
           if (shift.clientName && shift.location) {
@@ -140,14 +175,13 @@ const OCRUpload = () => {
         }
       }
 
-      const savedShifts = await addMultipleShifts(shiftsToSave);
-      
       toast({
         title: "Shifts saved successfully",
-        description: `Added ${savedShifts.length} shift${savedShifts.length === 1 ? '' : 's'} to your records`,
+        description: `Processed ${extractedShifts.length} shifts from OCR`,
       });
 
       setExtractedShifts([]);
+      setDuplicateResults([]);
     } catch (error) {
       toast({
         title: "Save failed",
@@ -347,15 +381,46 @@ const OCRUpload = () => {
                 Clear All
               </Button>
               <Button
-                onClick={saveAllShifts}
-                variant="success"
+                onClick={processOCRShifts}
+                variant="default"
               >
-                Save All Shifts ({extractedShifts.length})
+                Process Shifts ({extractedShifts.length})
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
+
+      <DuplicateHandlingModal
+        isOpen={showConflictModal}
+        onClose={() => setShowConflictModal(false)}
+        conflicts={duplicateResults.filter(r => r.status === 'potential_update')}
+        onChoicesMade={async (choices) => {
+          try {
+            await processShiftsWithChoices(duplicateResults, choices);
+            if (settings.autoSaveClientLocations) {
+              for (const shift of extractedShifts) {
+                if (shift.clientName && shift.location) {
+                  await saveClientProfile(shift.clientName, shift.location);
+                }
+              }
+            }
+            toast({
+              title: "Shifts saved successfully",
+              description: `Processed ${extractedShifts.length} shifts from OCR`,
+            });
+            setExtractedShifts([]);
+            setDuplicateResults([]);
+            setShowConflictModal(false);
+          } catch (error) {
+            toast({
+              title: "Save failed",
+              description: "There was an error saving your shifts",
+              variant: "destructive",
+            });
+          }
+        }}
+      />
     </div>
   );
 };

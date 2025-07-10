@@ -11,7 +11,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useShifts } from '@/hooks/useShifts';
 import { useClientProfiles } from '@/hooks/useClientProfiles';
 import { useNameAnonymization } from '@/hooks/useNameAnonymization';
+import { useDuplicateHandling } from '@/hooks/useDuplicateHandling';
 import { ShiftFormData } from '@/types/shift';
+import { DuplicateCheckResult, UpdateChoice } from '@/types/duplicateHandling';
+import DuplicateHandlingModal from '@/components/DuplicateHandlingModal';
+import ShiftPreviewSummary from '@/components/ShiftPreviewSummary';
 
 interface ParsedShift {
   id: string;
@@ -28,11 +32,14 @@ interface ParsedShift {
 export default function PasteShifts() {
   const [inputText, setInputText] = useState('');
   const [parsedShifts, setParsedShifts] = useState<ParsedShift[]>([]);
+  const [duplicateResults, setDuplicateResults] = useState<DuplicateCheckResult[]>([]);
+  const [showConflictModal, setShowConflictModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
-  const { addMultipleShifts, settings } = useShifts();
+  const { settings } = useShifts();
   const { findClientLocation, saveClientProfile } = useClientProfiles();
   const { anonymizeName } = useNameAnonymization();
+  const { checkForDuplicates, processShiftsWithChoices } = useDuplicateHandling();
 
   const parseShiftsFromText = async (text: string): Promise<ParsedShift[]> => {
     const lines = text.split('\n').filter(line => line.trim());
@@ -131,13 +138,35 @@ export default function PasteShifts() {
           description: "Please check your text format. Expected: DD/MM/YYYY ClientName HH:MM - HH:MM",
           variant: "destructive"
         });
-      } else {
-        setParsedShifts(shifts);
-        toast({
-          title: "Shifts extracted",
-          description: `Found ${shifts.length} shifts. Review and save when ready.`,
-        });
+        return;
       }
+
+      // Convert to ShiftFormData for duplicate checking
+      const shiftFormData: ShiftFormData[] = shifts.map(shift => ({
+        date: shift.date,
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        clientName: shift.clientName,
+        location: shift.location || '',
+        hourlyRate: shift.hourlyRate,
+        isPaid: false
+      }));
+
+      // Check for duplicates
+      const results = await checkForDuplicates(shiftFormData);
+      setDuplicateResults(results);
+      setParsedShifts(shifts);
+
+      // Check if there are conflicts that need user input
+      const conflicts = results.filter(r => r.status === 'potential_update');
+      if (conflicts.length > 0) {
+        setShowConflictModal(true);
+      }
+
+      toast({
+        title: "Shifts analyzed",
+        description: `Found ${shifts.length} shifts. ${conflicts.length} conflicts need resolution.`,
+      });
     } catch (error) {
       toast({
         title: "Processing failed",
@@ -167,109 +196,52 @@ export default function PasteShifts() {
     setParsedShifts(prev => prev.filter(shift => shift.id !== id));
   };
 
-  const handleSaveShifts = async () => {
-    console.log('🔄 Starting save process...');
-    console.log('📊 Parsed shifts:', parsedShifts);
-    
-    const shiftsWithMissingLocations = parsedShifts.filter(shift => shift.needsLocation);
-    
-    if (shiftsWithMissingLocations.length > 0) {
-      console.log('❌ Missing locations found:', shiftsWithMissingLocations);
-      toast({
-        title: "Missing locations",
-        description: `${shiftsWithMissingLocations.length} shifts need locations. Please fill them in first.`,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validate shifts before saving
-    const invalidShifts: string[] = [];
-    const shiftFormData: ShiftFormData[] = parsedShifts.map((shift, index) => {
-      // Check for missing or invalid client names
-      if (!shift.clientName || shift.clientName.trim().length === 0) {
-        invalidShifts.push(`Shift ${index + 1} on ${shift.date}: Missing client name`);
-      }
-      
-      // Check for missing location
-      if (!shift.location || shift.location.trim().length === 0) {
-        invalidShifts.push(`Shift ${index + 1} on ${shift.date}: Missing location`);
-      }
-
-      return {
-        date: shift.date,
-        startTime: shift.startTime,
-        endTime: shift.endTime,
-        clientName: shift.clientName,
-        location: shift.location!,
-        hourlyRate: shift.hourlyRate,
-        isPaid: false
-      };
-    });
-
-    if (invalidShifts.length > 0) {
-      console.log('❌ Validation errors:', invalidShifts);
-      toast({
-        title: "Validation errors",
-        description: invalidShifts.join('. '),
-        variant: "destructive"
-      });
-      return;
-    }
-
-    console.log('📤 Sending shift data to backend:', shiftFormData);
-
+  const handleConflictChoices = async (choices: UpdateChoice[]) => {
     try {
-      const savedShifts = await addMultipleShifts(shiftFormData);
-      console.log('✅ Backend response - saved shifts:', savedShifts);
-
-      // Save new client-location mappings using original names
-      const originalNameMapping = (parseShiftsFromText as any).originalNameMapping as Map<string, string>;
-      console.log('🗺️ Original name mapping:', Array.from(originalNameMapping.entries()));
+      const summary = await processShiftsWithChoices(duplicateResults, choices);
       
+      // Save client-location mappings
+      const originalNameMapping = (parseShiftsFromText as any).originalNameMapping as Map<string, string>;
       for (const shift of parsedShifts) {
         if (shift.location && settings.autoSaveClientLocations) {
-          // Use original name for storing the client profile mapping
           const originalName = originalNameMapping.get(shift.clientName) || shift.clientName;
-          console.log(`💾 Saving client profile: ${originalName} -> ${shift.location}`);
           await saveClientProfile(originalName, shift.location);
         }
       }
 
-      console.log('✅ All operations completed successfully');
       toast({
-        title: "Shifts saved",
-        description: `Successfully saved ${parsedShifts.length} shifts.`,
+        title: "Shifts processed successfully",
+        description: `${summary.newShifts} new, ${summary.updatedShifts} updated, ${summary.skippedShifts} skipped.`,
       });
 
       // Reset form
       setInputText('');
       setParsedShifts([]);
+      setDuplicateResults([]);
     } catch (error) {
-      console.error('❌ Save operation failed:', error);
-      console.error('Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : 'No stack trace',
-        errorObject: error
-      });
-      
-      // Check if shifts were actually saved despite the error
-      try {
-        console.log('🔍 Checking if shifts were saved despite error...');
-        // We could reload shifts here to verify if they were saved
-      } catch (checkError) {
-        console.error('❌ Failed to check shift status:', checkError);
-      }
-      
       toast({
         title: "Save failed",
-        description: error instanceof Error 
-          ? `Error: ${error.message}` 
-          : "There was an unknown error saving your shifts.",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
         variant: "destructive"
       });
     }
   };
+
+  const handleDirectSave = async () => {
+    // Handle cases where no conflicts exist
+    const nonConflictResults = duplicateResults.filter(r => r.status !== 'potential_update');
+    const defaultChoices: UpdateChoice[] = nonConflictResults.map(result => ({
+      shiftId: result.id,
+      action: 'update' // This won't be used for non-conflict items
+    }));
+
+    await handleConflictChoices(defaultChoices);
+  };
+
+  const canSaveDirectly = duplicateResults.filter(r => r.status === 'potential_update').length === 0 && 
+                         duplicateResults.filter(r => r.status === 'needs_location').length === 0;
+
+  const hasLocationIssues = duplicateResults.some(r => r.status === 'needs_location');
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -315,40 +287,38 @@ export default function PasteShifts() {
         </CardContent>
       </Card>
 
+      {duplicateResults.length > 0 && (
+        <ShiftPreviewSummary results={duplicateResults} />
+      )}
+
       {parsedShifts.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               Extracted Shifts ({parsedShifts.length})
-              <Button onClick={handleSaveShifts} variant="success">
-                Save All Shifts
-              </Button>
-            </CardTitle>
-            {/* Shift Preview Summary */}
-            <div className="bg-muted/50 rounded-lg p-4 mb-4">
-              <h4 className="font-medium mb-2">Preview of Extracted Shifts:</h4>
-              <div className="space-y-1 text-sm font-mono">
-                {parsedShifts.map((shift, index) => (
-                  <div key={shift.id} className="flex items-center gap-2">
-                    <span className="text-green-600">✓</span>
-                    <span>{new Date(shift.date).toLocaleDateString('en-GB')}</span>
-                    <span>–</span>
-                    <span className="font-medium">{shift.clientName}</span>
-                    <span>–</span>
-                    <span>{shift.startTime}–{shift.endTime}</span>
-                    <span>–</span>
-                    <span className={shift.needsLocation ? "text-destructive" : "text-muted-foreground"}>
-                      {shift.location || "Location needed"}
-                    </span>
-                  </div>
-                ))}
+              <div className="flex gap-2">
+                {canSaveDirectly && !hasLocationIssues && (
+                  <Button onClick={handleDirectSave} variant="default">
+                    Save All Shifts
+                  </Button>
+                )}
+                {hasLocationIssues && (
+                  <Button disabled variant="outline">
+                    Fix Locations First
+                  </Button>
+                )}
+                {duplicateResults.filter(r => r.status === 'potential_update').length > 0 && (
+                  <Button onClick={() => setShowConflictModal(true)} variant="secondary">
+                    Resolve Conflicts ({duplicateResults.filter(r => r.status === 'potential_update').length})
+                  </Button>
+                )}
               </div>
-            </div>
+            </CardTitle>
             
-            {parsedShifts.some(shift => shift.needsLocation) && (
+            {hasLocationIssues && (
               <Alert>
                 <AlertDescription>
-                  Some shifts need locations. Click the edit button to add missing locations.
+                  Some shifts need locations. Edit the shifts below to add missing locations.
                 </AlertDescription>
               </Alert>
             )}
@@ -444,6 +414,13 @@ export default function PasteShifts() {
           </CardContent>
         </Card>
       )}
+
+      <DuplicateHandlingModal
+        isOpen={showConflictModal}
+        onClose={() => setShowConflictModal(false)}
+        conflicts={duplicateResults.filter(r => r.status === 'potential_update')}
+        onChoicesMade={handleConflictChoices}
+      />
     </div>
   );
 }
