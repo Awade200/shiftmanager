@@ -137,7 +137,7 @@ export const useDuplicateHandling = () => {
         
       } else if (result.status === 'potential_update') {
         // Handle based on user choice
-        const choice = updateChoices.find(c => c.shiftId === result.id);
+        const choice = updateChoices.find(c => c.shiftId === result.existingShift?.id);
         
         if (choice?.action === 'update' && result.existingShift) {
           shiftsToUpdate.push({
