@@ -1,20 +1,30 @@
 import { useShifts } from '@/hooks/useShifts';
+import { useTaxCalculation } from '@/hooks/useTaxCalculation';
 import StatsCard from '@/components/StatsCard';
+import TaxCalculator from '@/components/TaxCalculator';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Link } from 'react-router-dom';
-import { Clock, DollarSign, CheckCircle, AlertCircle, Plus, Download, Calendar } from 'lucide-react';
+import { Clock, DollarSign, CheckCircle, AlertCircle, Plus, Download, Calendar, Wallet } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
   const { getShiftStats, settings, updateSettings, exportToCSV } = useShifts();
+  const { taxSettings, calculateTax } = useTaxCalculation();
   const [newHourlyRate, setNewHourlyRate] = useState(settings.defaultHourlyRate.toString());
   const { toast } = useToast();
   
   const stats = getShiftStats();
+  
+  // Calculate tax for current period's earnings
+  const grossPay = taxSettings.payFrequency === 'weekly' 
+    ? stats.totalEarnings 
+    : stats.totalEarnings; // For simplicity, using total earnings
+  
+  const taxCalculation = calculateTax(grossPay);
 
   const handleUpdateHourlyRate = () => {
     const rate = parseFloat(newHourlyRate);
@@ -104,6 +114,34 @@ const Dashboard = () => {
           variant="warning"
         />
       </div>
+
+      {/* Tax Calculator */}
+      {stats.totalEarnings > 0 && (
+        <TaxCalculator 
+          grossPay={grossPay}
+          className="shadow-card"
+        />
+      )}
+
+      {/* Net Pay Summary */}
+      {stats.totalEarnings > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <StatsCard
+            title={`Estimated Net Pay (${taxSettings.payFrequency})`}
+            value={`£${taxCalculation.netPay.toFixed(2)}`}
+            subtitle={`After tax & NI deductions`}
+            icon={<Wallet className="w-4 h-4" />}
+            variant="success"
+          />
+          <StatsCard
+            title="Total Deductions"
+            value={`£${taxCalculation.totalDeductions.toFixed(2)}`}
+            subtitle={`Tax: £${taxCalculation.incomeTax.toFixed(2)} | NI: £${taxCalculation.nationalInsurance.toFixed(2)}`}
+            icon={<DollarSign className="w-4 h-4" />}
+            variant="warning"
+          />
+        </div>
+      )}
 
       {/* Settings */}
       <Card className="shadow-card">

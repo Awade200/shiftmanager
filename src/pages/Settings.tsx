@@ -6,10 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Trash2, Plus, Shield, Eye, EyeOff } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Trash2, Plus, Shield, Eye, EyeOff, Calculator } from 'lucide-react';
 import { useShifts } from '@/hooks/useShifts';
 import { useNameAnonymization } from '@/hooks/useNameAnonymization';
+import { useTaxCalculation } from '@/hooks/useTaxCalculation';
 import { useToast } from '@/hooks/use-toast';
+import { TaxCode, PayFrequency } from '@/types/taxation';
 
 export default function Settings() {
   const { settings, updateSettings } = useShifts();
@@ -21,6 +24,7 @@ export default function Settings() {
     isAnonymizationEnabled,
     toggleAnonymization 
   } = useNameAnonymization();
+  const { taxSettings, updateTaxSettings } = useTaxCalculation();
   
   const { toast } = useToast();
   const [newRealName, setNewRealName] = useState('');
@@ -94,6 +98,96 @@ export default function Settings() {
               Auto-save client locations
             </Label>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Tax Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calculator className="w-5 h-5" />
+            Tax & National Insurance
+          </CardTitle>
+          <div className="text-sm text-muted-foreground">
+            Configure your tax code and pay frequency for accurate net pay calculations
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="tax-code">Tax Code</Label>
+              <Select 
+                value={taxSettings.taxCode} 
+                onValueChange={(value: TaxCode) => updateTaxSettings({ taxCode: value })}
+              >
+                <SelectTrigger id="tax-code">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1257L">
+                    <div>
+                      <div className="font-medium">1257L</div>
+                      <div className="text-xs text-muted-foreground">Standard personal allowance</div>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="BR">
+                    <div>
+                      <div className="font-medium">BR</div>
+                      <div className="text-xs text-muted-foreground">Basic rate (20%) - no allowance</div>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="D0">
+                    <div>
+                      <div className="font-medium">D0</div>
+                      <div className="text-xs text-muted-foreground">Higher rate (40%) - no allowance</div>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="D1">
+                    <div>
+                      <div className="font-medium">D1</div>
+                      <div className="text-xs text-muted-foreground">Additional rate (45%) - no allowance</div>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="0T">
+                    <div>
+                      <div className="font-medium">0T</div>
+                      <div className="text-xs text-muted-foreground">No allowance - basic rate</div>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="NT">
+                    <div>
+                      <div className="font-medium">NT</div>
+                      <div className="text-xs text-muted-foreground">No tax</div>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="pay-frequency">Pay Frequency</Label>
+              <Select 
+                value={taxSettings.payFrequency} 
+                onValueChange={(value: PayFrequency) => updateTaxSettings({ payFrequency: value })}
+              >
+                <SelectTrigger id="pay-frequency">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <Alert>
+            <Calculator className="w-4 h-4" />
+            <AlertDescription>
+              These settings will be used to calculate income tax and National Insurance deductions 
+              based on UK PAYE rates for the 2024/25 tax year.
+            </AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
 
