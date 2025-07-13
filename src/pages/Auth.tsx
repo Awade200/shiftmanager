@@ -81,14 +81,20 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Shift Tracker</CardTitle>
-          <CardDescription>
-            Sign in to your account or create a new one
-          </CardDescription>
-        </CardHeader>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-secondary/5 p-4">
+      <div className="w-full max-w-md">
+        <Card className="shadow-elegant bg-gradient-card backdrop-blur-sm border-border/50">
+          <CardHeader className="text-center space-y-4 pb-6">
+            <div className="mx-auto w-16 h-16 bg-gradient-primary rounded-2xl flex items-center justify-center mb-2">
+              <User className="h-8 w-8 text-primary-foreground" />
+            </div>
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+              Welcome to Shift Tracker
+            </CardTitle>
+            <CardDescription className="text-muted-foreground text-base">
+              Track your work shifts and manage your schedule with ease
+            </CardDescription>
+          </CardHeader>
         <CardContent>
           <Tabs defaultValue="signin" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
@@ -191,7 +197,8 @@ const Auth = () => {
             </TabsContent>
           </Tabs>
         </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 };
