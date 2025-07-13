@@ -144,111 +144,63 @@ export default function PasteShifts() {
       location?: string;
     }> = [];
     
-    let currentDate = '';
-    let currentDay = '';
+    let currentDate = null;
+    let parsedShifts = [];
     
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      console.log(`Processing line ${i}: "${line}"`);
+    // First pass: associate dates with lines that have times
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
       
-      // Look for day pattern: "Monday", "Tuesday", etc.
-      const dayMatch = line.match(/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?:\s|$)/i);
-      if (dayMatch) {
-        currentDay = dayMatch[1];
-        console.log('Found day:', currentDay);
+      // Check if line contains a date
+      if (trimmed.match(/\d{2}\/\d{2}\/\d{4}/)) {
+        currentDate = trimmed.match(/\d{2}\/\d{2}\/\d{4}/)[0];
+        console.log('Found date:', currentDate);
         
-        // Check if the line also contains client code and service info
-        const dayWithServiceMatch = line.match(/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+([A-Z0-9]+)\s+(.+?)\s+(\d+\.?\d*)$/i);
-        if (dayWithServiceMatch) {
-          // Day + service on same line, look for date on next line
-          if (i + 1 < lines.length) {
-            const nextLine = lines[i + 1];
-            const dateMatch = nextLine.match(/^(\d{1,2}\/\d{1,2}\/\d{4})/);
-            if (dateMatch) {
-              currentDate = dateMatch[1];
-              console.log('Found date:', currentDate);
-              i++; // Skip the date line
-            }
-          }
+        // If this line also has times, it's a complete line
+        if (trimmed.match(/\d{2}:\d{2}\s*-\s*\d{2}:\d{2}/)) {
+          parsedShifts.push(trimmed);
         }
-        continue;
+      } else if (trimmed.match(/\d{2}:\d{2}\s*-\s*\d{2}:\d{2}/) && currentDate) {
+        // Line has times but no date, prepend the current date
+        parsedShifts.push(`${currentDate} ${trimmed}`);
       }
+    }
+    
+    console.log('Lines with dates and times:', parsedShifts);
+    
+    // Second pass: parse each complete line
+    for (const lineWithDate of parsedShifts) {
+      // Extract date
+      const dateMatch = lineWithDate.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+      if (!dateMatch) continue;
       
-      // Look for standalone date
-      const dateMatch = line.match(/^(\d{1,2}\/\d{1,2}\/\d{4})(?:\s|$)/);
-      if (dateMatch) {
-        currentDate = dateMatch[1];
-        console.log('Found standalone date:', currentDate);
-        continue;
-      }
+      const dateStr = dateMatch[1];
+      const [day, month, year] = dateStr.split('/');
+      const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
       
-      // Look for client code + service type + quantity pattern
-      const clientServiceMatch = line.match(/^([A-Z0-9]+)\s+(.+?)\s+(\d+\.?\d*)$/);
-      if (clientServiceMatch) {
-        const [, clientCode, serviceType, quantity] = clientServiceMatch;
-        console.log(`Found client service: ${clientCode}, ${serviceType}, ${quantity}`);
-        
-        // Look for client name and time on next line
-        if (i + 1 < lines.length) {
-          const nextLine = lines[i + 1];
-          const clientTimeMatch = nextLine.match(/^(.+?)\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
-          if (clientTimeMatch) {
-            const [, clientName, startTime, endTime] = clientTimeMatch;
-            
-            if (currentDate) {
-              // Convert date format from DD/MM/YYYY to YYYY-MM-DD
-              const [day, month, year] = currentDate.split('/');
-              const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-              
-              const shift = {
-                date: formattedDate,
-                clientName: clientName.trim(),
-                startTime: normalizeTime(startTime),
-                endTime: normalizeTime(endTime),
-                location: serviceType.trim()
-              };
-              
-              shifts.push(shift);
-              console.log('Added Employee Timesheet shift:', shift);
-            }
-            i++; // Skip the client+time line
-          }
-        }
-        continue;
-      }
+      // Extract time
+      const timeMatch = lineWithDate.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
+      if (!timeMatch) continue;
       
-      // Alternative: Look for standalone client name + time pattern (for cases where service info is on a previous line)
-      const clientTimeMatch = line.match(/^(.+?)\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
-      if (clientTimeMatch && currentDate) {
-        const [, clientName, startTime, endTime] = clientTimeMatch;
-        
-        // Look backwards for the most recent service info
-        let serviceType = 'Supported Living Day Shift';
-        
-        for (let j = i - 1; j >= 0 && j >= i - 3; j--) {
-          const prevLine = lines[j];
-          const serviceMatch = prevLine.match(/^([A-Z0-9]+)\s+(.+?)\s+(\d+\.?\d*)$/);
-          if (serviceMatch) {
-            serviceType = serviceMatch[2].trim();
-            break;
-          }
-        }
-        
-        // Convert date format from DD/MM/YYYY to YYYY-MM-DD
-        const [day, month, year] = currentDate.split('/');
-        const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-        
-        const shift = {
-          date: formattedDate,
-          clientName: clientName.trim(),
-          startTime: normalizeTime(startTime),
-          endTime: normalizeTime(endTime),
-          location: serviceType
-        };
-        
-        shifts.push(shift);
-        console.log('Added alternative Employee Timesheet shift:', shift);
-      }
+      const [, startTime, endTime] = timeMatch;
+      
+      // Extract client name (everything between date and time)
+      const clientMatch = lineWithDate.match(/\d{1,2}\/\d{1,2}\/\d{4}\s+(.+?)\s+\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}/);
+      if (!clientMatch) continue;
+      
+      const clientName = clientMatch[1].trim();
+      
+      const shift = {
+        date: formattedDate,
+        clientName: clientName,
+        startTime: normalizeTime(startTime),
+        endTime: normalizeTime(endTime),
+        location: 'Supported Living Day Shift'
+      };
+      
+      shifts.push(shift);
+      console.log('Added shift:', shift);
     }
     
     console.log(`Employee Timesheet parser found ${shifts.length} shifts`);
