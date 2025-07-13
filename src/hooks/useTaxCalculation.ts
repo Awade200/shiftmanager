@@ -1,32 +1,9 @@
 import { useState, useEffect } from 'react';
 import { TaxCode, PayFrequency, TaxCalculation, TaxSettings, TaxBand } from '@/types/taxation';
 
-// 2024/25 UK tax rates
-const TAX_BANDS_WEEKLY: TaxBand[] = [
-  { min: 0, max: 241.73, rate: 0 },        // Personal allowance
-  { min: 241.74, max: 967, rate: 0.20 },   // Basic rate
-  { min: 967.01, max: 2400, rate: 0.40 },  // Higher rate
-  { min: 2400.01, max: null, rate: 0.45 }  // Additional rate
-];
-
-const TAX_BANDS_MONTHLY: TaxBand[] = [
-  { min: 0, max: 1047.50, rate: 0 },        // Personal allowance (£12,570/12)
-  { min: 1047.51, max: 4189, rate: 0.20 },  // Basic rate
-  { min: 4189.01, max: 10400, rate: 0.40 }, // Higher rate
-  { min: 10400.01, max: null, rate: 0.45 }  // Additional rate
-];
-
-const NI_BANDS_WEEKLY: TaxBand[] = [
-  { min: 0, max: 242, rate: 0 },
-  { min: 242.01, max: 967, rate: 0.12 },
-  { min: 967.01, max: null, rate: 0.02 }
-];
-
-const NI_BANDS_MONTHLY: TaxBand[] = [
-  { min: 0, max: 1048, rate: 0 },
-  { min: 1048.01, max: 4189, rate: 0.12 },
-  { min: 4189.01, max: null, rate: 0.02 }
-];
+// 2024/25 UK PAYE Configuration
+const TAX_YEAR = '2024/25';
+const WEEKLY_ALLOWANCE_1257L = 12570 / 52; // £241.73
 
 const SETTINGS_KEY = 'tax-settings';
 
@@ -63,96 +40,104 @@ export const useTaxCalculation = () => {
       additionalRateTax: 0
     };
 
-    // Handle different tax codes
-    switch (taxCode) {
-      case 'BR':
-        breakdown.basicRateTax = grossPay * 0.20;
-        return { amount: breakdown.basicRateTax, breakdown };
-      
-      case 'D0':
-        breakdown.higherRateTax = grossPay * 0.40;
-        return { amount: breakdown.higherRateTax, breakdown };
-      
-      case 'D1':
-        breakdown.additionalRateTax = grossPay * 0.45;
-        return { amount: breakdown.additionalRateTax, breakdown };
-      
-      case '0T':
-        breakdown.basicRateTax = grossPay * 0.20;
-        return { amount: breakdown.basicRateTax, breakdown };
-      
-      case 'NT':
-        return { amount: 0, breakdown };
-      
-      case '1257L':
-      default:
-        // Standard calculation with personal allowance
-        const taxBands = payFrequency === 'weekly' ? TAX_BANDS_WEEKLY : TAX_BANDS_MONTHLY;
-        let totalTax = 0;
-        let remainingPay = grossPay;
+    // Handle no tax case
+    if (taxCode === 'NT') return { amount: 0, breakdown };
 
-        for (const band of taxBands) {
-          if (remainingPay <= 0) break;
-
-          const bandMin = band.min;
-          const bandMax = band.max || Infinity;
-          const taxableInBand = Math.min(Math.max(0, remainingPay - (bandMin - Math.min(grossPay, bandMin))), bandMax - bandMin);
-          
-          if (taxableInBand > 0) {
-            const taxInBand = taxableInBand * band.rate;
-            totalTax += taxInBand;
-
-            // Track breakdown
-            if (band.rate === 0) {
-              breakdown.personalAllowance += taxableInBand;
-            } else if (band.rate === 0.20) {
-              breakdown.basicRateTax += taxInBand;
-            } else if (band.rate === 0.40) {
-              breakdown.higherRateTax += taxInBand;
-            } else if (band.rate === 0.45) {
-              breakdown.additionalRateTax += taxInBand;
-            }
-          }
-        }
-
-        return { amount: totalTax, breakdown };
+    // Simple flat-rate codes
+    const flatRates: Record<string, number> = { 
+      BR: 0.20, 
+      D0: 0.40, 
+      D1: 0.45, 
+      '0T': 0.20 
+    };
+    
+    if (flatRates[taxCode]) {
+      const amount = +(grossPay * flatRates[taxCode]).toFixed(2);
+      if (taxCode === 'BR' || taxCode === '0T') {
+        breakdown.basicRateTax = amount;
+      } else if (taxCode === 'D0') {
+        breakdown.higherRateTax = amount;
+      } else if (taxCode === 'D1') {
+        breakdown.additionalRateTax = amount;
+      }
+      return { amount, breakdown };
     }
+
+    // Standard 1257L logic
+    const allowance = payFrequency === 'weekly' ? WEEKLY_ALLOWANCE_1257L : WEEKLY_ALLOWANCE_1257L * 52 / 12;
+    const taxable = Math.max(0, grossPay - allowance);
+    let tax = 0;
+
+    breakdown.personalAllowance = Math.min(grossPay, allowance);
+
+    if (taxable > 0) {
+      // Calculate basic rate limit based on frequency
+      const basicLimit = payFrequency === 'weekly' ? 
+        (37700 / 52) : // Weekly: £37,700 / 52 = £725
+        (37700 / 12);  // Monthly: £37,700 / 12 = £3,141.67
+
+      if (taxable <= basicLimit) {
+        // All taxable income at basic rate (20%)
+        tax = taxable * 0.20;
+        breakdown.basicRateTax = tax;
+      } else {
+        // Basic rate portion
+        const basicTax = basicLimit * 0.20;
+        breakdown.basicRateTax = basicTax;
+        
+        // Higher rate portion (40%)
+        const higherRateIncome = Math.min(taxable - basicLimit, 
+          payFrequency === 'weekly' ? (125140 - 37700) / 52 : (125140 - 37700) / 12
+        );
+        const higherTax = higherRateIncome * 0.40;
+        breakdown.higherRateTax = higherTax;
+        
+        // Additional rate portion (45%) for income over £125,140
+        const additionalRateIncome = Math.max(0, taxable - basicLimit - higherRateIncome);
+        const additionalTax = additionalRateIncome * 0.45;
+        breakdown.additionalRateTax = additionalTax;
+        
+        tax = basicTax + higherTax + additionalTax;
+      }
+    }
+
+    return { amount: +tax.toFixed(2), breakdown };
   };
 
   const calculateNationalInsurance = (grossPay: number, payFrequency: PayFrequency): { amount: number; breakdown: any } => {
-    const niBands = payFrequency === 'weekly' ? NI_BANDS_WEEKLY : NI_BANDS_MONTHLY;
     const breakdown = {
       niLowerRate: 0,
       niHigherRate: 0
     };
 
+    // Convert thresholds based on pay frequency
+    const primaryThreshold = payFrequency === 'weekly' ? 242 : 242 * 52 / 12; // £1,048/month
+    const upperEarningsLimit = payFrequency === 'weekly' ? 967 : 967 * 52 / 12; // £4,189/month
+
+    // No NI if below primary threshold
+    if (grossPay <= primaryThreshold) return { amount: 0, breakdown };
+
     let totalNI = 0;
-    let remainingPay = grossPay;
 
-    for (const band of niBands) {
-      if (remainingPay <= 0) break;
+    // 12% rate between primary threshold and upper earnings limit
+    if (grossPay <= upperEarningsLimit) {
+      const niableIncome = grossPay - primaryThreshold;
+      totalNI = niableIncome * 0.12;
+      breakdown.niLowerRate = totalNI;
+    } else {
+      // 12% up to upper limit, then 2% above
+      const lowerRateIncome = upperEarningsLimit - primaryThreshold;
+      const lowerRateNI = lowerRateIncome * 0.12;
+      breakdown.niLowerRate = lowerRateNI;
 
-      const bandMin = band.min;
-      const bandMax = band.max || Infinity;
-      
-      if (grossPay > bandMin) {
-        const taxableInBand = Math.min(grossPay - bandMin, bandMax - bandMin);
-        
-        if (taxableInBand > 0) {
-          const niInBand = taxableInBand * band.rate;
-          totalNI += niInBand;
+      const higherRateIncome = grossPay - upperEarningsLimit;
+      const higherRateNI = higherRateIncome * 0.02;
+      breakdown.niHigherRate = higherRateNI;
 
-          // Track breakdown
-          if (band.rate === 0.12) {
-            breakdown.niLowerRate += niInBand;
-          } else if (band.rate === 0.02) {
-            breakdown.niHigherRate += niInBand;
-          }
-        }
-      }
+      totalNI = lowerRateNI + higherRateNI;
     }
 
-    return { amount: totalNI, breakdown };
+    return { amount: +totalNI.toFixed(2), breakdown };
   };
 
   const calculateTax = (grossPay: number): TaxCalculation => {
