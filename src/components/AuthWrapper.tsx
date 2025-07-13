@@ -75,9 +75,19 @@ const AuthWrapper = ({ children }: AuthWrapperProps) => {
     );
   }
 
+  if (!user && window.location.pathname !== '/auth') {
+    // Redirect to auth page if not authenticated and not already on auth page
+    navigate('/auth');
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
   if (!user) {
-    // Auth page will be rendered by the router
-    return null;
+    // Allow auth page to render when not authenticated
+    return <>{children}</>;
   }
 
   return (
