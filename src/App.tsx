@@ -12,6 +12,7 @@ import TodaysShifts from "./pages/TodaysShifts";
 import PasteShifts from "./pages/PasteShifts";
 import GroupedShifts from "./pages/GroupedShifts";
 import Settings from "./pages/Settings";
+import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,25 +23,76 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        {/* AuthWrapper temporarily disabled for development */}
-        {/* <AuthWrapper> */}
-          <div className="min-h-screen bg-background">
-            <Navigation />
-            <main>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/add-shift" element={<AddShift />} />
-          <Route path="/all-shifts" element={<AllShifts />} />
-          <Route path="/todays-shifts" element={<TodaysShifts />} />
-          <Route path="/paste-shifts" element={<PasteShifts />} />
-          <Route path="/grouped-shifts" element={<GroupedShifts />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-            </main>
-          </div>
-        {/* </AuthWrapper> */}
+        <AuthWrapper>
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/" element={
+              <div className="min-h-screen bg-background">
+                <Navigation />
+                <main>
+                  <Dashboard />
+                </main>
+              </div>
+            } />
+            <Route path="/dashboard" element={
+              <div className="min-h-screen bg-background">
+                <Navigation />
+                <main>
+                  <Dashboard />
+                </main>
+              </div>
+            } />
+            <Route path="/add-shift" element={
+              <div className="min-h-screen bg-background">
+                <Navigation />
+                <main>
+                  <AddShift />
+                </main>
+              </div>
+            } />
+            <Route path="/all-shifts" element={
+              <div className="min-h-screen bg-background">
+                <Navigation />
+                <main>
+                  <AllShifts />
+                </main>
+              </div>
+            } />
+            <Route path="/todays-shifts" element={
+              <div className="min-h-screen bg-background">
+                <Navigation />
+                <main>
+                  <TodaysShifts />
+                </main>
+              </div>
+            } />
+            <Route path="/paste-shifts" element={
+              <div className="min-h-screen bg-background">
+                <Navigation />
+                <main>
+                  <PasteShifts />
+                </main>
+              </div>
+            } />
+            <Route path="/grouped-shifts" element={
+              <div className="min-h-screen bg-background">
+                <Navigation />
+                <main>
+                  <GroupedShifts />
+                </main>
+              </div>
+            } />
+            <Route path="/settings" element={
+              <div className="min-h-screen bg-background">
+                <Navigation />
+                <main>
+                  <Settings />
+                </main>
+              </div>
+            } />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthWrapper>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
