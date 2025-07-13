@@ -48,76 +48,102 @@ export default function PasteShifts() {
 
     console.log('Parsing text with lines:', lines);
 
-    // Try Employee Timesheet format first
-    const timesheetShifts = parseEmployeeTimesheetFormat(lines);
-    if (timesheetShifts.length > 0) {
-      console.log('Found Employee Timesheet format shifts:', timesheetShifts);
-      for (const shift of timesheetShifts) {
+    // Try structured rota format first
+    const structuredShifts = extractStructuredShifts(text);
+    if (structuredShifts.length > 0) {
+      console.log('Found Structured Rota format shifts:', structuredShifts);
+      for (const shift of structuredShifts) {
         const displayClientName = anonymizeName(shift.clientName);
         originalNameMapping.set(displayClientName, shift.clientName);
         const existingLocation = findClientLocation(shift.clientName);
+        
+        // Parse time range
+        const [startTime, endTime] = shift.time.split('-').map(t => normalizeTime(t.trim()));
         
         shifts.push({
           id: Math.random().toString(36).substr(2, 9),
           date: shift.date,
           clientName: displayClientName,
-          startTime: shift.startTime,
-          endTime: shift.endTime,
-          location: existingLocation || shift.location,
+          startTime,
+          endTime,
+          location: existingLocation || shift.service,
           hourlyRate: settings.defaultHourlyRate,
-          needsLocation: !existingLocation && !shift.location,
+          needsLocation: !existingLocation && !shift.service,
           isEditing: false
         });
       }
     } else {
-      // Fallback to original format parsing
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-
-        // Strict pattern: DD/MM/YYYY ClientName HH:MM - HH:MM (must use hyphen, not en dash)
-        // More flexible with client name to handle multiple words
-        const match = trimmed.match(/^(\d{1,2}\/\d{1,2}\/\d{4})\s+(.+?)\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
-        
-        if (match) {
-          const [, dateStr, clientName, startTime, endTime] = match;
+      // Try Employee Timesheet format
+      const timesheetShifts = parseEmployeeTimesheetFormat(lines);
+      if (timesheetShifts.length > 0) {
+        console.log('Found Employee Timesheet format shifts:', timesheetShifts);
+        for (const shift of timesheetShifts) {
+          const displayClientName = anonymizeName(shift.clientName);
+          originalNameMapping.set(displayClientName, shift.clientName);
+          const existingLocation = findClientLocation(shift.clientName);
           
-          // Validate time format is strict HH:MM
-          if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) {
-            console.warn(`Skipping invalid time format: ${startTime} - ${endTime}`);
-            continue; // Skip invalid time formats
-          }
-          
-          // Convert date format from DD/MM/YYYY to YYYY-MM-DD
-          const [day, month, year] = dateStr.split('/');
-          const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-          
-          // Anonymize the client name for privacy
-          const originalClientName = clientName.trim();
-          const displayClientName = anonymizeName(originalClientName);
-          
-          // Store mapping for later use
-          originalNameMapping.set(displayClientName, originalClientName);
-          
-          // Check for existing location using original name
-          const existingLocation = findClientLocation(originalClientName);
-          
-          const shift: ParsedShift = {
+          shifts.push({
             id: Math.random().toString(36).substr(2, 9),
-            date: formattedDate,
+            date: shift.date,
             clientName: displayClientName,
-            startTime: normalizeTime(startTime),
-            endTime: normalizeTime(endTime),
-            location: existingLocation || undefined,
+            startTime: shift.startTime,
+            endTime: shift.endTime,
+            location: existingLocation || shift.location,
             hourlyRate: settings.defaultHourlyRate,
-            needsLocation: !existingLocation,
+            needsLocation: !existingLocation && !shift.location,
             isEditing: false
-          };
+          });
+        }
+      } else {
+        // Fallback to original format parsing
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+
+          // Strict pattern: DD/MM/YYYY ClientName HH:MM - HH:MM (must use hyphen, not en dash)
+          // More flexible with client name to handle multiple words
+          const match = trimmed.match(/^(\d{1,2}\/\d{1,2}\/\d{4})\s+(.+?)\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
           
-          shifts.push(shift);
-          console.log(`Extracted shift: ${formattedDate} ${displayClientName} ${startTime}-${endTime}`);
-        } else {
-          console.warn(`Failed to parse line: ${trimmed}`);
+          if (match) {
+            const [, dateStr, clientName, startTime, endTime] = match;
+            
+            // Validate time format is strict HH:MM
+            if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) {
+              console.warn(`Skipping invalid time format: ${startTime} - ${endTime}`);
+              continue; // Skip invalid time formats
+            }
+            
+            // Convert date format from DD/MM/YYYY to YYYY-MM-DD
+            const [day, month, year] = dateStr.split('/');
+            const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            
+            // Anonymize the client name for privacy
+            const originalClientName = clientName.trim();
+            const displayClientName = anonymizeName(originalClientName);
+            
+            // Store mapping for later use
+            originalNameMapping.set(displayClientName, originalClientName);
+            
+            // Check for existing location using original name
+            const existingLocation = findClientLocation(originalClientName);
+            
+            const shift: ParsedShift = {
+              id: Math.random().toString(36).substr(2, 9),
+              date: formattedDate,
+              clientName: displayClientName,
+              startTime: normalizeTime(startTime),
+              endTime: normalizeTime(endTime),
+              location: existingLocation || undefined,
+              hourlyRate: settings.defaultHourlyRate,
+              needsLocation: !existingLocation,
+              isEditing: false
+            };
+            
+            shifts.push(shift);
+            console.log(`Extracted shift: ${formattedDate} ${displayClientName} ${startTime}-${endTime}`);
+          } else {
+            console.warn(`Failed to parse line: ${trimmed}`);
+          }
         }
       }
     }
@@ -126,6 +152,71 @@ export default function PasteShifts() {
     (parseShiftsFromText as any).originalNameMapping = originalNameMapping;
     
     console.log('Final parsed shifts:', shifts);
+    return shifts;
+  };
+
+  const extractStructuredShifts = (rawText: string) => {
+    const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
+
+    const shifts = [];
+    let currentDay = null;
+    let currentDate = null;
+    let currentClient = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Match Day
+      if (/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$/i.test(line)) {
+        currentDay = line;
+        continue;
+      }
+
+      // Match Client ID (e.g., CD2325)
+      if (/^CD\d{4,}/.test(line)) {
+        currentClient = {
+          id: line,
+          name: '',
+          shifts: []
+        };
+        continue;
+      }
+
+      // Match Date and Client Name
+      if (/^\d{2}\/\d{2}\/\d{4}/.test(line)) {
+        const [date, ...nameParts] = line.split(' ');
+        currentDate = date;
+        if (currentClient) {
+          currentClient.name = nameParts.join(' ');
+        }
+        continue;
+      }
+
+      // Match Service + Quantity
+      if (line.includes('Supported Living Day Shift')) {
+        const match = line.match(/Shift\s([\d.]+)/);
+        const hours = match ? parseFloat(match[1]) : null;
+        const timeLine = lines[i + 1] && lines[i + 1].match(/\d{2}:\d{2}-\d{2}:\d{2}/) ? lines[i + 1] : null;
+
+        if (hours && timeLine && currentClient && currentDate) {
+          // Convert date format from DD/MM/YYYY to YYYY-MM-DD
+          const [day, month, year] = currentDate.split('/');
+          const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          
+          shifts.push({
+            day: currentDay,
+            date: formattedDate,
+            clientId: currentClient.id,
+            clientName: currentClient.name || 'Unknown',
+            time: timeLine,
+            hours,
+            service: 'Supported Living Day Shift'
+          });
+          i++; // skip next line (time)
+        }
+      }
+    }
+
     return shifts;
   };
 
