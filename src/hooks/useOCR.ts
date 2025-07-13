@@ -222,11 +222,20 @@ export const useOCR = () => {
     const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     
     console.log('Parsing timesheet format with lines:', lines);
+    console.log('Total lines to process:', lines.length);
     
-    // Try structured format first (Monday 30/06/2025, CD1795 – James Gladstone, etc.)
-    const structuredShifts = parseStructuredFormat(lines);
-    if (structuredShifts.length > 0) {
-      shifts.push(...structuredShifts);
+    // Try specific Employee Timesheet format first
+    const employeeTimesheetShifts = parseEmployeeTimesheetFormat(lines);
+    if (employeeTimesheetShifts.length > 0) {
+      shifts.push(...employeeTimesheetShifts);
+    }
+    
+    // Try structured format if no Employee Timesheet format found
+    if (shifts.length === 0) {
+      const structuredShifts = parseStructuredFormat(lines);
+      if (structuredShifts.length > 0) {
+        shifts.push(...structuredShifts);
+      }
     }
     
     if (shifts.length === 0) {
@@ -309,6 +318,114 @@ export const useOCR = () => {
     }
     
     console.log('Parsed shifts:', shifts);
+    return shifts;
+  };
+
+  const parseEmployeeTimesheetFormat = (lines: string[]): OCRResult[] => {
+    const shifts: OCRResult[] = [];
+    console.log('Trying Employee Timesheet format parser...');
+    
+    let currentDate = '';
+    let currentDay = '';
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      console.log(`Processing line ${i}: "${line}"`);
+      
+      // Look for day pattern: "Monday" or "Tuesday" etc (on its own line or followed by client code)
+      const dayMatch = line.match(/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?:\s+([A-Z0-9]+))?/i);
+      if (dayMatch) {
+        currentDay = dayMatch[1];
+        console.log('Found day:', currentDay);
+        
+        // Check if next line has a date
+        if (i + 1 < lines.length) {
+          const nextLine = lines[i + 1];
+          const dateMatch = nextLine.match(/^(\d{1,2}\/\d{1,2}\/\d{4})/);
+          if (dateMatch) {
+            currentDate = dateMatch[1];
+            console.log('Found date:', currentDate);
+            i++; // Skip the date line
+          }
+        }
+        continue;
+      }
+      
+      // Look for client code + service type + quantity pattern
+      // "CD2328 Supported Living Day Shift 12.00"
+      const clientServiceMatch = line.match(/^([A-Z0-9]+)\s+(.+?)\s+(\d+\.?\d*)$/);
+      if (clientServiceMatch) {
+        const [, clientCode, serviceType, quantity] = clientServiceMatch;
+        console.log(`Found client service: ${clientCode}, ${serviceType}, ${quantity}`);
+        
+        // Look for client name and time on next line
+        if (i + 1 < lines.length) {
+          const nextLine = lines[i + 1];
+          const clientTimeMatch = nextLine.match(/^(.+?)\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+          if (clientTimeMatch) {
+            const [, clientName, startTime, endTime] = clientTimeMatch;
+            
+            try {
+              const shift: OCRResult = {
+                date: convertDateFormat(currentDate),
+                startTime: normalizeTimeString(startTime),
+                endTime: normalizeTimeString(endTime),
+                clientName: clientName.trim(),
+                location: serviceType.trim(),
+                serviceType: serviceType.trim(),
+                duration: parseFloat(quantity)
+              };
+              
+              shifts.push(shift);
+              console.log('Added Employee Timesheet shift:', shift);
+              i++; // Skip the client+time line
+            } catch (error) {
+              console.log('Error parsing Employee Timesheet shift:', error);
+            }
+          }
+        }
+        continue;
+      }
+      
+      // Alternative: Look for standalone client name + time pattern
+      const clientTimeMatch = line.match(/^(.+?)\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+      if (clientTimeMatch && currentDate) {
+        const [, clientName, startTime, endTime] = clientTimeMatch;
+        
+        // Look backwards for the most recent service info
+        let serviceType = 'Supported Living Day Shift';
+        let quantity = 0;
+        
+        for (let j = i - 1; j >= 0 && j >= i - 3; j--) {
+          const prevLine = lines[j];
+          const serviceMatch = prevLine.match(/^([A-Z0-9]+)\s+(.+?)\s+(\d+\.?\d*)$/);
+          if (serviceMatch) {
+            serviceType = serviceMatch[2].trim();
+            quantity = parseFloat(serviceMatch[3]);
+            break;
+          }
+        }
+        
+        try {
+          const shift: OCRResult = {
+            date: convertDateFormat(currentDate),
+            startTime: normalizeTimeString(startTime),
+            endTime: normalizeTimeString(endTime),
+            clientName: clientName.trim(),
+            location: serviceType,
+            serviceType: serviceType,
+            duration: quantity || calculateDurationFromTimes(startTime, endTime)
+          };
+          
+          shifts.push(shift);
+          console.log('Added alternative Employee Timesheet shift:', shift);
+        } catch (error) {
+          console.log('Error parsing alternative Employee Timesheet shift:', error);
+        }
+      }
+    }
+    
+    console.log(`Employee Timesheet parser found ${shifts.length} shifts`);
     return shifts;
   };
 
