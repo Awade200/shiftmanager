@@ -46,59 +46,212 @@ export default function PasteShifts() {
     const shifts: ParsedShift[] = [];
     const originalNameMapping = new Map<string, string>(); // displayName -> originalName
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
+    console.log('Parsing text with lines:', lines);
 
-      // Strict pattern: DD/MM/YYYY ClientName HH:MM - HH:MM (must use hyphen, not en dash)
-      // More flexible with client name to handle multiple words
-      const match = trimmed.match(/^(\d{1,2}\/\d{1,2}\/\d{4})\s+(.+?)\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
-      
-      if (match) {
-        const [, dateStr, clientName, startTime, endTime] = match;
+    // Try Employee Timesheet format first
+    const timesheetShifts = parseEmployeeTimesheetFormat(lines);
+    if (timesheetShifts.length > 0) {
+      console.log('Found Employee Timesheet format shifts:', timesheetShifts);
+      for (const shift of timesheetShifts) {
+        const displayClientName = anonymizeName(shift.clientName);
+        originalNameMapping.set(displayClientName, shift.clientName);
+        const existingLocation = findClientLocation(shift.clientName);
         
-        // Validate time format is strict HH:MM
-        if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) {
-          console.warn(`Skipping invalid time format: ${startTime} - ${endTime}`);
-          continue; // Skip invalid time formats
-        }
-        
-        // Convert date format from DD/MM/YYYY to YYYY-MM-DD
-        const [day, month, year] = dateStr.split('/');
-        const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-        
-        // Anonymize the client name for privacy
-        const originalClientName = clientName.trim();
-        const displayClientName = anonymizeName(originalClientName);
-        
-        // Store mapping for later use
-        originalNameMapping.set(displayClientName, originalClientName);
-        
-        // Check for existing location using original name
-        const existingLocation = findClientLocation(originalClientName);
-        
-        const shift: ParsedShift = {
+        shifts.push({
           id: Math.random().toString(36).substr(2, 9),
-          date: formattedDate,
+          date: shift.date,
           clientName: displayClientName,
-          startTime: normalizeTime(startTime),
-          endTime: normalizeTime(endTime),
-          location: existingLocation || undefined,
+          startTime: shift.startTime,
+          endTime: shift.endTime,
+          location: existingLocation || shift.location,
           hourlyRate: settings.defaultHourlyRate,
-          needsLocation: !existingLocation,
+          needsLocation: !existingLocation && !shift.location,
           isEditing: false
-        };
+        });
+      }
+    } else {
+      // Fallback to original format parsing
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        // Strict pattern: DD/MM/YYYY ClientName HH:MM - HH:MM (must use hyphen, not en dash)
+        // More flexible with client name to handle multiple words
+        const match = trimmed.match(/^(\d{1,2}\/\d{1,2}\/\d{4})\s+(.+?)\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
         
-        shifts.push(shift);
-        console.log(`Extracted shift: ${formattedDate} ${displayClientName} ${startTime}-${endTime}`);
-      } else {
-        console.warn(`Failed to parse line: ${trimmed}`);
+        if (match) {
+          const [, dateStr, clientName, startTime, endTime] = match;
+          
+          // Validate time format is strict HH:MM
+          if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) {
+            console.warn(`Skipping invalid time format: ${startTime} - ${endTime}`);
+            continue; // Skip invalid time formats
+          }
+          
+          // Convert date format from DD/MM/YYYY to YYYY-MM-DD
+          const [day, month, year] = dateStr.split('/');
+          const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          
+          // Anonymize the client name for privacy
+          const originalClientName = clientName.trim();
+          const displayClientName = anonymizeName(originalClientName);
+          
+          // Store mapping for later use
+          originalNameMapping.set(displayClientName, originalClientName);
+          
+          // Check for existing location using original name
+          const existingLocation = findClientLocation(originalClientName);
+          
+          const shift: ParsedShift = {
+            id: Math.random().toString(36).substr(2, 9),
+            date: formattedDate,
+            clientName: displayClientName,
+            startTime: normalizeTime(startTime),
+            endTime: normalizeTime(endTime),
+            location: existingLocation || undefined,
+            hourlyRate: settings.defaultHourlyRate,
+            needsLocation: !existingLocation,
+            isEditing: false
+          };
+          
+          shifts.push(shift);
+          console.log(`Extracted shift: ${formattedDate} ${displayClientName} ${startTime}-${endTime}`);
+        } else {
+          console.warn(`Failed to parse line: ${trimmed}`);
+        }
       }
     }
 
     // Store the original name mappings for use in save function
     (parseShiftsFromText as any).originalNameMapping = originalNameMapping;
     
+    console.log('Final parsed shifts:', shifts);
+    return shifts;
+  };
+
+  const parseEmployeeTimesheetFormat = (lines: string[]): Array<{
+    date: string;
+    clientName: string;
+    startTime: string;
+    endTime: string;
+    location?: string;
+  }> => {
+    const shifts: Array<{
+      date: string;
+      clientName: string;
+      startTime: string;
+      endTime: string;
+      location?: string;
+    }> = [];
+    
+    let currentDate = '';
+    let currentDay = '';
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      console.log(`Processing line ${i}: "${line}"`);
+      
+      // Look for day pattern: "Monday", "Tuesday", etc.
+      const dayMatch = line.match(/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?:\s|$)/i);
+      if (dayMatch) {
+        currentDay = dayMatch[1];
+        console.log('Found day:', currentDay);
+        
+        // Check if the line also contains client code and service info
+        const dayWithServiceMatch = line.match(/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+([A-Z0-9]+)\s+(.+?)\s+(\d+\.?\d*)$/i);
+        if (dayWithServiceMatch) {
+          // Day + service on same line, look for date on next line
+          if (i + 1 < lines.length) {
+            const nextLine = lines[i + 1];
+            const dateMatch = nextLine.match(/^(\d{1,2}\/\d{1,2}\/\d{4})/);
+            if (dateMatch) {
+              currentDate = dateMatch[1];
+              console.log('Found date:', currentDate);
+              i++; // Skip the date line
+            }
+          }
+        }
+        continue;
+      }
+      
+      // Look for standalone date
+      const dateMatch = line.match(/^(\d{1,2}\/\d{1,2}\/\d{4})(?:\s|$)/);
+      if (dateMatch) {
+        currentDate = dateMatch[1];
+        console.log('Found standalone date:', currentDate);
+        continue;
+      }
+      
+      // Look for client code + service type + quantity pattern
+      const clientServiceMatch = line.match(/^([A-Z0-9]+)\s+(.+?)\s+(\d+\.?\d*)$/);
+      if (clientServiceMatch) {
+        const [, clientCode, serviceType, quantity] = clientServiceMatch;
+        console.log(`Found client service: ${clientCode}, ${serviceType}, ${quantity}`);
+        
+        // Look for client name and time on next line
+        if (i + 1 < lines.length) {
+          const nextLine = lines[i + 1];
+          const clientTimeMatch = nextLine.match(/^(.+?)\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+          if (clientTimeMatch) {
+            const [, clientName, startTime, endTime] = clientTimeMatch;
+            
+            if (currentDate) {
+              // Convert date format from DD/MM/YYYY to YYYY-MM-DD
+              const [day, month, year] = currentDate.split('/');
+              const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+              
+              const shift = {
+                date: formattedDate,
+                clientName: clientName.trim(),
+                startTime: normalizeTime(startTime),
+                endTime: normalizeTime(endTime),
+                location: serviceType.trim()
+              };
+              
+              shifts.push(shift);
+              console.log('Added Employee Timesheet shift:', shift);
+            }
+            i++; // Skip the client+time line
+          }
+        }
+        continue;
+      }
+      
+      // Alternative: Look for standalone client name + time pattern (for cases where service info is on a previous line)
+      const clientTimeMatch = line.match(/^(.+?)\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+      if (clientTimeMatch && currentDate) {
+        const [, clientName, startTime, endTime] = clientTimeMatch;
+        
+        // Look backwards for the most recent service info
+        let serviceType = 'Supported Living Day Shift';
+        
+        for (let j = i - 1; j >= 0 && j >= i - 3; j--) {
+          const prevLine = lines[j];
+          const serviceMatch = prevLine.match(/^([A-Z0-9]+)\s+(.+?)\s+(\d+\.?\d*)$/);
+          if (serviceMatch) {
+            serviceType = serviceMatch[2].trim();
+            break;
+          }
+        }
+        
+        // Convert date format from DD/MM/YYYY to YYYY-MM-DD
+        const [day, month, year] = currentDate.split('/');
+        const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        
+        const shift = {
+          date: formattedDate,
+          clientName: clientName.trim(),
+          startTime: normalizeTime(startTime),
+          endTime: normalizeTime(endTime),
+          location: serviceType
+        };
+        
+        shifts.push(shift);
+        console.log('Added alternative Employee Timesheet shift:', shift);
+      }
+    }
+    
+    console.log(`Employee Timesheet parser found ${shifts.length} shifts`);
     return shifts;
   };
 
