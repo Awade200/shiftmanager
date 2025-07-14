@@ -28,6 +28,8 @@ const AuthWrapper = ({ children }: AuthWrapperProps) => {
         // Redirect to auth page if not authenticated
         if (!session && window.location.pathname !== '/auth') {
           navigate('/auth');
+        } else if (session && window.location.pathname === '/auth') {
+          navigate('/dashboard');
         }
       }
     );
@@ -41,6 +43,8 @@ const AuthWrapper = ({ children }: AuthWrapperProps) => {
       // Redirect to auth page if not authenticated
       if (!session && window.location.pathname !== '/auth') {
         navigate('/auth');
+      } else if (session && window.location.pathname === '/auth') {
+        navigate('/dashboard');
       }
     });
 

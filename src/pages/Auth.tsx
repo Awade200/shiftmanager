@@ -39,6 +39,8 @@ const Auth = () => {
             title: "Welcome!",
             description: "Account created successfully. You are now logged in.",
           });
+          // Redirect to dashboard immediately
+          window.location.href = '/dashboard';
         } else {
           toast({
             title: "Account Created!",
@@ -85,7 +87,8 @@ const Auth = () => {
           title: "Welcome back!",
           description: "You have been signed in successfully.",
         });
-        // The AuthWrapper will handle the redirect
+        // Redirect to dashboard
+        window.location.href = '/dashboard';
       }
     } catch (error: any) {
       let errorMessage = error.message;
