@@ -24,7 +24,6 @@ const Auth = () => {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
           data: {
             display_name: displayName
           }
@@ -34,15 +33,34 @@ const Auth = () => {
       if (error) throw error;
 
       if (data.user) {
-        toast({
-          title: "Success!",
-          description: "Please check your email to confirm your account.",
-        });
+        // Check if email confirmation is disabled (user will have session immediately)
+        if (data.session) {
+          toast({
+            title: "Welcome!",
+            description: "Account created successfully. You are now logged in.",
+          });
+        } else {
+          toast({
+            title: "Account Created!",
+            description: "You can now sign in with your credentials.",
+          });
+        }
       }
     } catch (error: any) {
+      let errorMessage = error.message;
+      
+      // Provide more user-friendly error messages
+      if (error.message.includes("User already registered")) {
+        errorMessage = "An account with this email already exists. Please sign in instead.";
+      } else if (error.message.includes("Password should be at least")) {
+        errorMessage = "Password must be at least 6 characters long.";
+      } else if (error.message.includes("Invalid email")) {
+        errorMessage = "Please enter a valid email address.";
+      }
+      
       toast({
-        title: "Error",
-        description: error.message,
+        title: "Sign Up Error",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -70,9 +88,18 @@ const Auth = () => {
         // The AuthWrapper will handle the redirect
       }
     } catch (error: any) {
+      let errorMessage = error.message;
+      
+      // Provide more user-friendly error messages
+      if (error.message.includes("Invalid login credentials")) {
+        errorMessage = "Invalid email or password. Please check your credentials and try again.";
+      } else if (error.message.includes("Email not confirmed")) {
+        errorMessage = "Please check your email to confirm your account before signing in.";
+      }
+      
       toast({
-        title: "Error",
-        description: error.message,
+        title: "Sign In Error",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
