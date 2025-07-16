@@ -35,6 +35,7 @@ export default function PasteShifts() {
   const [duplicateResults, setDuplicateResults] = useState<DuplicateCheckResult[]>([]);
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [originalNameMapping, setOriginalNameMapping] = useState<Map<string, string>>(new Map());
   const { toast } = useToast();
   const { settings } = useShifts();
   const { findClientLocation, saveClientProfile } = useClientProfiles();
@@ -149,7 +150,7 @@ export default function PasteShifts() {
     }
 
     // Store the original name mappings for use in save function
-    (parseShiftsFromText as any).originalNameMapping = originalNameMapping;
+    setOriginalNameMapping(originalNameMapping);
     
     console.log('Final parsed shifts:', shifts);
     return shifts;
@@ -397,7 +398,6 @@ export default function PasteShifts() {
       const summary = await processShiftsWithChoices(duplicateResults, choices);
       
       // Save client-location mappings
-      const originalNameMapping = (parseShiftsFromText as any).originalNameMapping as Map<string, string>;
       for (const shift of parsedShifts) {
         if (shift.location && settings.autoSaveClientLocations) {
           const originalName = originalNameMapping.get(shift.clientName) || shift.clientName;
