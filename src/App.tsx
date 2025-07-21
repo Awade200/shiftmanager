@@ -10,6 +10,8 @@ import AllShifts from "./pages/AllShifts";
 import TodaysShifts from "./pages/TodaysShifts";
 import PasteShifts from "./pages/PasteShifts";
 import GroupedShifts from "./pages/GroupedShifts";
+import Analytics from "./pages/Analytics";
+import Calendar from "./pages/Calendar";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -75,6 +77,22 @@ const App = () => (
               <Navigation />
               <main>
                 <GroupedShifts />
+              </main>
+            </div>
+          } />
+          <Route path="/analytics" element={
+            <div className="min-h-screen bg-background">
+              <Navigation />
+              <main>
+                <Analytics />
+              </main>
+            </div>
+          } />
+          <Route path="/calendar" element={
+            <div className="min-h-screen bg-background">
+              <Navigation />
+              <main>
+                <Calendar />
               </main>
             </div>
           } />

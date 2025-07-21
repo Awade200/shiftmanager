@@ -83,6 +83,9 @@ export default function Settings() {
                   defaultHourlyRate: parseFloat(e.target.value) || 0 
                 })}
               />
+              <div className="text-sm text-muted-foreground mt-1">
+                This rate will automatically apply to all future shifts
+              </div>
             </div>
           </div>
 
