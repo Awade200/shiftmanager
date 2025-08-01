@@ -32,23 +32,35 @@ export const useDuplicateHandling = () => {
       for (const newShift of newShifts) {
         const shiftKey = generateShiftKey(newShift.date, newShift.startTime, newShift.endTime, newShift.clientName);
         
-        // Check if shift already exists
-        const { data: existingShifts, error } = await supabase
+        // Check for exact duplicates first
+        const { data: exactDuplicates, error: exactError } = await supabase
           .from('shifts')
-          .select('id, start_time, end_time, location')
+          .select('id, start_time, end_time, location, client_name')
           .eq('shift_key', shiftKey);
 
-        if (error) {
-          console.error('Error checking duplicates:', error);
+        if (exactError) {
+          console.error('Error checking exact duplicates:', exactError);
           throw new Error('Failed to check for duplicates');
+        }
+
+        // Check for time conflicts on the same day
+        const { data: conflictingShifts, error: conflictError } = await supabase
+          .from('shifts')
+          .select('id, start_time, end_time, location, client_name')
+          .eq('date', newShift.date);
+
+        if (conflictError) {
+          console.error('Error checking time conflicts:', conflictError);
+          throw new Error('Failed to check for time conflicts');
         }
 
         let status: DuplicateCheckResult['status'] = 'new';
         let existingShift = undefined;
         let conflicts = undefined;
 
-        if (existingShifts && existingShifts.length > 0) {
-          const existing = existingShifts[0];
+        // Check for exact duplicates
+        if (exactDuplicates && exactDuplicates.length > 0) {
+          const existing = exactDuplicates[0];
           
           // Check if times match exactly
           if (existing.start_time === newShift.startTime && existing.end_time === newShift.endTime) {
@@ -67,6 +79,44 @@ export const useDuplicateHandling = () => {
             endTime: existing.end_time,
             location: existing.location,
           };
+        } else if (conflictingShifts && conflictingShifts.length > 0) {
+          // Check for time overlaps
+          const newStart = new Date(`2000-01-01T${newShift.startTime}`);
+          const newEnd = new Date(`2000-01-01T${newShift.endTime}`);
+          
+          // Handle overnight shifts
+          if (newEnd < newStart) {
+            newEnd.setDate(newEnd.getDate() + 1);
+          }
+
+          for (const existing of conflictingShifts) {
+            const existingStart = new Date(`2000-01-01T${existing.start_time}`);
+            const existingEnd = new Date(`2000-01-01T${existing.end_time}`);
+            
+            // Handle overnight shifts for existing
+            if (existingEnd < existingStart) {
+              existingEnd.setDate(existingEnd.getDate() + 1);
+            }
+
+            // Check for overlap: new shift starts before existing ends AND new shift ends after existing starts
+            const hasOverlap = newStart < existingEnd && newEnd > existingStart;
+            
+            if (hasOverlap) {
+              status = 'potential_update';
+              conflicts = {
+                startTime: true,
+                endTime: true,
+              };
+              
+              existingShift = {
+                id: existing.id,
+                startTime: existing.start_time,
+                endTime: existing.end_time,
+                location: existing.location,
+              };
+              break; // Found a conflict, no need to check further
+            }
+          }
         }
 
         // Check if location is needed
