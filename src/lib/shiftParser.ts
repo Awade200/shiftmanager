@@ -35,7 +35,9 @@ const PATTERNS = {
   hoursQuantity: /(?:Shift|Hours?)\s+([\d.]+)/i,
   trailingFloat: /\b([\d.]{1,5})\s*$/,
   serviceKeywords: /(?:Supported Living|Day Shift|Night Shift|Respite|Personal Care)/i,
-  pageFooter: /^(?:Run Date:|Page|Employee No:|Total|Grand Total)/i
+  pageFooter: /^(?:Run Date:|Page|Employee No:|Total|Grand Total)/i,
+  // New pattern for your format: CD code followed by service and hours
+  codeServiceHours: /^(CD\d{3,5})\s+(.+?)\s+([\d.]+)$/i
 };
 
 // Normalization pipeline
@@ -129,9 +131,12 @@ export function parseRota(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr' =
 
     // Check for significant mismatch between stated and computed hours
     if (pendingHours && Math.abs(computedHours - pendingHours) > 0.25) {
-      finalHours = computedHours;
-      hoursCorrected = true;
-      warnings.push(`Hours corrected for ${currentClientName} on ${currentDate}: ${pendingHours}h → ${computedHours}h`);
+      finalHours = pendingHours; // Use the provided hours, not computed
+      hoursCorrected = false;
+      // Only warn if the difference is very large (over 1 hour)
+      if (Math.abs(computedHours - pendingHours) > 1) {
+        warnings.push(`Large time difference detected for ${currentClientName}: computed ${computedHours}h vs stated ${pendingHours}h`);
+      }
     }
 
     shifts.push({
@@ -149,8 +154,10 @@ export function parseRota(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr' =
       needsLocation: !currentClientName
     });
 
-    // Clear service-specific state but keep day/date/client
+    // Reset only the shift-specific state, keep day/date for next shifts
     pendingHours = null;
+    currentClientCode = '';
+    currentClientName = '';
     currentService = '';
     bufferLines = [];
   }
@@ -179,9 +186,30 @@ export function parseRota(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr' =
       lineProcessed = true;
     }
 
-    // Check for client code
+    // Check for your specific format: CD code + service + hours
+    const codeServiceHoursMatch = line.match(PATTERNS.codeServiceHours);
+    if (codeServiceHoursMatch) {
+      currentClientCode = codeServiceHoursMatch[1];
+      currentService = codeServiceHoursMatch[2];
+      pendingHours = parseFloat(codeServiceHoursMatch[3]);
+      lineProcessed = true;
+    }
+
+    // Check for client name + time range pattern (your format's second line)
+    const timeMatch = line.match(PATTERNS.timeRange);
+    if (timeMatch && !codeServiceHoursMatch && !PATTERNS.clientCode.test(line)) {
+      // This might be a client name + time range line
+      const beforeTime = line.substring(0, line.indexOf(timeMatch[0])).trim();
+      if (beforeTime && currentClientCode && !currentClientName) {
+        currentClientName = beforeTime;
+      }
+      emitShift(timeMatch[1], timeMatch[2]);
+      lineProcessed = true;
+    }
+
+    // Check for client code (fallback for other formats)
     const codeMatch = line.match(PATTERNS.clientCode);
-    if (codeMatch) {
+    if (codeMatch && !codeServiceHoursMatch) {
       currentClientCode = codeMatch[0];
       // Check if client name is on the same line
       const afterCode = line.replace(codeMatch[0], '').trim();
@@ -191,10 +219,10 @@ export function parseRota(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr' =
       lineProcessed = true;
     }
 
-    // Check for service with hours
+    // Check for service with hours (fallback)
     const serviceMatch = line.match(PATTERNS.serviceKeywords);
     const hoursMatch = line.match(PATTERNS.hoursQuantity);
-    if (serviceMatch || hoursMatch) {
+    if ((serviceMatch || hoursMatch) && !codeServiceHoursMatch) {
       if (serviceMatch) {
         currentService = serviceMatch[0];
       }
@@ -210,13 +238,6 @@ export function parseRota(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr' =
       lineProcessed = true;
     }
 
-    // Check for standalone time range
-    const timeMatch = line.match(PATTERNS.timeRange);
-    if (timeMatch && !serviceMatch) {
-      emitShift(timeMatch[1], timeMatch[2]);
-      lineProcessed = true;
-    }
-
     // Check for client name (if we have a client code but no name yet)
     if (!lineProcessed && currentClientCode && !currentClientName) {
       // Avoid mistaking service lines, dates, codes as names
@@ -224,7 +245,8 @@ export function parseRota(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr' =
           !PATTERNS.date.test(line) && 
           !PATTERNS.clientCode.test(line) &&
           !PATTERNS.day.test(line) &&
-          !PATTERNS.timeRange.test(line)) {
+          !PATTERNS.timeRange.test(line) &&
+          !PATTERNS.trailingFloat.test(line)) {
         currentClientName = line;
         lineProcessed = true;
       }
