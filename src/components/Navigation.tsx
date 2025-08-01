@@ -4,6 +4,13 @@ import { Home, Plus, Calendar, Clock, Clipboard, Settings, Users, TrendingUp, Ca
 
 const Navigation = () => {
   const location = useLocation();
+  const { user, signOut } = useMobileAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: Home },

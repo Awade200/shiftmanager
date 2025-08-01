@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Shift, ShiftFormData, ShiftStats } from '@/types/shift';
+import { useMobileAuth } from './useMobileAuth';
 
 const SETTINGS_KEY = 'shift-manager-settings';
 
@@ -20,12 +21,15 @@ export const useShifts = () => {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [loading, setLoading] = useState(true);
+  const { user } = useMobileAuth();
 
   // Load shifts from Supabase on mount
   useEffect(() => {
-    loadShifts();
+    if (user?.mobile_number) {
+      loadShifts();
+    }
     loadSettings();
-  }, []);
+  }, [user?.mobile_number]);
 
   const loadShifts = async () => {
     try {
