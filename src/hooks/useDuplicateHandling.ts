@@ -58,18 +58,29 @@ export const useDuplicateHandling = () => {
         let existingShift = undefined;
         let conflicts = undefined;
 
+        // Helper function to normalize time format (remove seconds if present)
+        const normalizeTime = (time: string): string => {
+          return time.length > 5 ? time.substring(0, 5) : time;
+        };
+
         // Check for exact duplicates
         if (exactDuplicates && exactDuplicates.length > 0) {
           const existing = exactDuplicates[0];
           
+          // Normalize times for comparison
+          const existingStartNorm = normalizeTime(existing.start_time);
+          const existingEndNorm = normalizeTime(existing.end_time);
+          const newStartNorm = normalizeTime(newShift.startTime);
+          const newEndNorm = normalizeTime(newShift.endTime);
+          
           // Check if times match exactly
-          if (existing.start_time === newShift.startTime && existing.end_time === newShift.endTime) {
+          if (existingStartNorm === newStartNorm && existingEndNorm === newEndNorm) {
             status = 'duplicate';
           } else {
             status = 'potential_update';
             conflicts = {
-              startTime: existing.start_time !== newShift.startTime,
-              endTime: existing.end_time !== newShift.endTime,
+              startTime: existingStartNorm !== newStartNorm,
+              endTime: existingEndNorm !== newEndNorm,
             };
           }
           
@@ -81,8 +92,8 @@ export const useDuplicateHandling = () => {
           };
         } else if (conflictingShifts && conflictingShifts.length > 0) {
           // Check for time overlaps
-          const newStart = new Date(`2000-01-01T${newShift.startTime}`);
-          const newEnd = new Date(`2000-01-01T${newShift.endTime}`);
+          const newStart = new Date(`2000-01-01T${newShift.startTime}:00`);
+          const newEnd = new Date(`2000-01-01T${newShift.endTime}:00`);
           
           // Handle overnight shifts
           if (newEnd < newStart) {
@@ -90,8 +101,12 @@ export const useDuplicateHandling = () => {
           }
 
           for (const existing of conflictingShifts) {
-            const existingStart = new Date(`2000-01-01T${existing.start_time}`);
-            const existingEnd = new Date(`2000-01-01T${existing.end_time}`);
+            // Ensure existing times have seconds for Date parsing
+            const existingStartTime = existing.start_time.length > 5 ? existing.start_time : existing.start_time + ':00';
+            const existingEndTime = existing.end_time.length > 5 ? existing.end_time : existing.end_time + ':00';
+            
+            const existingStart = new Date(`2000-01-01T${existingStartTime}`);
+            const existingEnd = new Date(`2000-01-01T${existingEndTime}`);
             
             // Handle overnight shifts for existing
             if (existingEnd < existingStart) {
@@ -100,6 +115,11 @@ export const useDuplicateHandling = () => {
 
             // Check for overlap: new shift starts before existing ends AND new shift ends after existing starts
             const hasOverlap = newStart < existingEnd && newEnd > existingStart;
+            
+            console.log(`Checking overlap for ${newShift.clientName} on ${newShift.date}:`);
+            console.log(`  New: ${newStart.toTimeString()} - ${newEnd.toTimeString()}`);
+            console.log(`  Existing: ${existingStart.toTimeString()} - ${existingEnd.toTimeString()}`);
+            console.log(`  Has overlap: ${hasOverlap}`);
             
             if (hasOverlap) {
               status = 'potential_update';
