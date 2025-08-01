@@ -11,11 +11,12 @@ import { useClientProfiles } from '@/hooks/useClientProfiles';
 import { useDuplicateHandling } from '@/hooks/useDuplicateHandling';
 import { DuplicateCheckResult, UpdateChoice } from '@/types/duplicateHandling';
 import { ShiftFormData } from '@/types/shift';
+import DuplicateHandlingModal from './DuplicateHandlingModal';
 
 interface ShiftPreviewProps {
   shifts: ShiftRow[];
   onShiftsUpdated: (shifts: ShiftRow[]) => void;
-  onSave: (shifts: ShiftFormData[], duplicateChoices?: UpdateChoice[]) => void;
+  onSave: (shifts: ShiftFormData[]) => void;
 }
 
 interface ShiftWithId extends ShiftRow {
@@ -32,10 +33,11 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
   const [editedShifts, setEditedShifts] = useState<Record<string, Partial<ShiftRow>>>({});
   const [groupBy, setGroupBy] = useState<'none' | 'day' | 'client'>('none');
   const [duplicateResults, setDuplicateResults] = useState<DuplicateCheckResult[]>([]);
-  const [showingDuplicates, setShowingDuplicates] = useState(false);
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [pendingShifts, setPendingShifts] = useState<ShiftFormData[]>([]);
   
   const { findClientLocation, saveClientProfile } = useClientProfiles();
-  const { checkForDuplicates, processShiftsWithChoices } = useDuplicateHandling();
+  const { checkForDuplicates, processShiftsWithChoices, isProcessing } = useDuplicateHandling();
 
   // Generate unique IDs for shifts
   const shiftsWithIds = useMemo(() => {
@@ -189,10 +191,17 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
 
     const results = await checkForDuplicates(shiftFormData);
     setDuplicateResults(results);
-    setShowingDuplicates(true);
+    
+    // Show summary of conflicts found
+    const conflicts = results.filter(r => r.status === 'potential_update' || r.status === 'duplicate');
+    if (conflicts.length > 0) {
+      console.log(`Found ${conflicts.length} time conflicts!`);
+    } else {
+      console.log('No conflicts found');
+    }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const finalShifts = shiftsWithIds.map(shift => ({
       ...shift,
       ...editedShifts[shift.id]
@@ -208,7 +217,33 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
       isPaid: false
     }));
 
-    onSave(shiftFormData);
+    // Check for duplicates before saving
+    const results = await checkForDuplicates(shiftFormData);
+    const conflicts = results.filter(r => r.status === 'potential_update' || r.status === 'duplicate');
+    
+    if (conflicts.length > 0) {
+      // Show duplicate handling modal
+      setDuplicateResults(results);
+      setPendingShifts(shiftFormData);
+      setShowConflictModal(true);
+    } else {
+      // No conflicts, save directly
+      onSave(shiftFormData);
+    }
+  };
+
+  const handleConflictChoices = async (choices: UpdateChoice[]) => {
+    try {
+      await processShiftsWithChoices(duplicateResults, choices);
+      setShowConflictModal(false);
+      setPendingShifts([]);
+      setDuplicateResults([]);
+      
+      // Clear the extracted shifts after successful save
+      onShiftsUpdated([]);
+    } catch (error) {
+      console.error('Failed to process shifts with choices:', error);
+    }
   };
 
   const getBadgeForStatus = (status: ShiftStatus) => {
@@ -296,9 +331,9 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
             <RefreshCw className="h-4 w-4 mr-2" />
             Check Duplicates
           </Button>
-          <Button onClick={handleSave} disabled={summaryStats.needsLocation > 0}>
+          <Button onClick={handleSave} disabled={summaryStats.needsLocation > 0 || isProcessing}>
             <Save className="h-4 w-4 mr-2" />
-            Save All Shifts
+            {isProcessing ? 'Checking Conflicts...' : 'Save All Shifts'}
           </Button>
         </div>
       </div>
@@ -431,6 +466,18 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
           </Card>
         ))}
       </div>
+
+      {/* Duplicate Handling Modal */}
+      <DuplicateHandlingModal
+        isOpen={showConflictModal}
+        onClose={() => {
+          setShowConflictModal(false);
+          setPendingShifts([]);
+          setDuplicateResults([]);
+        }}
+        conflicts={duplicateResults.filter(r => r.status === 'potential_update' || r.status === 'duplicate')}
+        onChoicesMade={handleConflictChoices}
+      />
     </div>
   );
 }
