@@ -1,6 +1,7 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Home, Plus, Calendar, Clock, Clipboard, Settings, Users, TrendingUp, CalendarDays } from 'lucide-react';
+import { useMobileAuth } from '@/hooks/useMobileAuth';
 
 const Navigation = () => {
   const location = useLocation();
