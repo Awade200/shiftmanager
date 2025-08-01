@@ -37,6 +37,7 @@ export const useShifts = () => {
       const { data, error } = await supabase
         .from('shifts')
         .select('*')
+        .eq('mobile_number', user?.mobile_number)
         .order('date', { ascending: false });
 
       if (error) {
@@ -101,19 +102,16 @@ export const useShifts = () => {
   };
 
   const addShift = async (shiftData: ShiftFormData): Promise<Shift> => {
+    if (!user?.mobile_number) {
+      throw new Error('User must be logged in to add shifts');
+    }
+
     const duration = calculateDuration(shiftData.startTime, shiftData.endTime);
     const earnings = duration * shiftData.hourlyRate;
-    
-    // Temporarily bypass authentication for development
-    const mockUserId = '00000000-0000-0000-0000-000000000000';
-    
-    // const { data: { user } } = await supabase.auth.getUser();
-    // if (!user) {
-    //   throw new Error('User must be logged in to add shifts');
-    // }
 
     const shiftToInsert = {
-      user_id: mockUserId, // user.id,
+      user_id: '00000000-0000-0000-0000-000000000000', // Keep for schema compatibility
+      mobile_number: user.mobile_number,
       date: shiftData.date,
       start_time: shiftData.startTime,
       end_time: shiftData.endTime,
@@ -158,16 +156,11 @@ export const useShifts = () => {
   };
 
   const addMultipleShifts = async (shiftsData: ShiftFormData[]): Promise<Shift[]> => {
+    if (!user?.mobile_number) {
+      throw new Error('User must be logged in to add shifts');
+    }
+
     console.log('🚀 addMultipleShifts called with data:', shiftsData);
-    
-    // Temporarily bypass authentication for development
-    const mockUserId = '00000000-0000-0000-0000-000000000000';
-    console.log('👤 Using mock user ID:', mockUserId);
-    
-    // const { data: { user } } = await supabase.auth.getUser();
-    // if (!user) {
-    //   throw new Error('User must be logged in to add shifts');
-    // }
 
     const shiftsToInsert = shiftsData.map((shiftData, index) => {
       console.log(`📝 Processing shift ${index + 1}:`, shiftData);
@@ -176,7 +169,8 @@ export const useShifts = () => {
       const earnings = duration * shiftData.hourlyRate;
       
       const insertData = {
-        user_id: mockUserId, // user.id,
+        user_id: '00000000-0000-0000-0000-000000000000', // Keep for schema compatibility
+        mobile_number: user.mobile_number,
         date: shiftData.date,
         start_time: shiftData.startTime,
         end_time: shiftData.endTime,
