@@ -17,11 +17,6 @@ export const useMobileAuth = () => {
     if (storedUser) {
       const userData = JSON.parse(storedUser);
       setUser(userData);
-      // Set session config for RLS
-      supabase.rpc('set_config', {
-        setting_name: 'app.current_mobile_number',
-        setting_value: userData.mobile_number
-      });
     }
     setLoading(false);
   }, []);
@@ -60,12 +55,6 @@ export const useMobileAuth = () => {
 
       localStorage.setItem('mobile_auth_user', JSON.stringify(userData));
       setUser(userData);
-
-      // Set session config for RLS
-      await supabase.rpc('set_config', {
-        setting_name: 'app.current_mobile_number',
-        setting_value: data.mobile_number
-      });
 
       return { success: true };
     } catch (error: any) {
@@ -106,12 +95,6 @@ export const useMobileAuth = () => {
       localStorage.setItem('mobile_auth_user', JSON.stringify(userData));
       setUser(userData);
 
-      // Set session config for RLS
-      await supabase.rpc('set_config', {
-        setting_name: 'app.current_mobile_number',
-        setting_value: data.mobile_number
-      });
-
       return { success: true };
     } catch (error: any) {
       return { success: false, error: error.message };
@@ -123,11 +106,6 @@ export const useMobileAuth = () => {
   const signOut = async () => {
     localStorage.removeItem('mobile_auth_user');
     setUser(null);
-    // Clear session config
-    await supabase.rpc('set_config', {
-      setting_name: 'app.current_mobile_number',
-      setting_value: ''
-    });
   };
 
   return {

@@ -1550,6 +1550,10 @@ export type Database = {
         }
         Returns: string
       }
+      set_config: {
+        Args: { setting_name: string; setting_value: string }
+        Returns: undefined
+      }
       validate_production_requirements: {
         Args: { p_product_id: string; p_quantity: number; p_location: string }
         Returns: {
