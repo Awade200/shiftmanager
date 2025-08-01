@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useMobileAuth } from "@/hooks/useMobileAuth";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/AppSidebar";
 import Navigation from "./components/Navigation";
 import Dashboard from "./pages/Dashboard";
 import AddShift from "./pages/AddShift";
@@ -40,6 +42,20 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const AppLayout = ({ children }: { children: React.ReactNode }) => (
+  <SidebarProvider defaultOpen={true}>
+    <div className="min-h-screen flex w-full bg-background">
+      <AppSidebar />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Navigation />
+        <main className="flex-1 overflow-auto">
+          {children}
+        </main>
+      </div>
+    </div>
+  </SidebarProvider>
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -50,102 +66,72 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/" element={
             <ProtectedRoute>
-              <div className="min-h-screen bg-background">
-                <Navigation />
-                <main>
-                  <Dashboard />
-                </main>
-              </div>
+              <AppLayout>
+                <Dashboard />
+              </AppLayout>
             </ProtectedRoute>
           } />
           <Route path="/dashboard" element={
             <ProtectedRoute>
-              <div className="min-h-screen bg-background">
-                <Navigation />
-                <main>
-                  <Dashboard />
-                </main>
-              </div>
+              <AppLayout>
+                <Dashboard />
+              </AppLayout>
             </ProtectedRoute>
           } />
           <Route path="/add-shift" element={
             <ProtectedRoute>
-              <div className="min-h-screen bg-background">
-                <Navigation />
-                <main>
-                  <AddShift />
-                </main>
-              </div>
+              <AppLayout>
+                <AddShift />
+              </AppLayout>
             </ProtectedRoute>
           } />
           <Route path="/all-shifts" element={
             <ProtectedRoute>
-              <div className="min-h-screen bg-background">
-                <Navigation />
-                <main>
-                  <AllShifts />
-                </main>
-              </div>
+              <AppLayout>
+                <AllShifts />
+              </AppLayout>
             </ProtectedRoute>
           } />
           <Route path="/todays-shifts" element={
             <ProtectedRoute>
-              <div className="min-h-screen bg-background">
-                <Navigation />
-                <main>
-                  <TodaysShifts />
-                </main>
-              </div>
+              <AppLayout>
+                <TodaysShifts />
+              </AppLayout>
             </ProtectedRoute>
           } />
           <Route path="/paste-shifts" element={
             <ProtectedRoute>
-              <div className="min-h-screen bg-background">
-                <Navigation />
-                <main>
-                  <PasteShifts />
-                </main>
-              </div>
+              <AppLayout>
+                <PasteShifts />
+              </AppLayout>
             </ProtectedRoute>
           } />
           <Route path="/grouped-shifts" element={
             <ProtectedRoute>
-              <div className="min-h-screen bg-background">
-                <Navigation />
-                <main>
-                  <GroupedShifts />
-                </main>
-              </div>
+              <AppLayout>
+                <GroupedShifts />
+              </AppLayout>
             </ProtectedRoute>
           } />
           <Route path="/analytics" element={
             <ProtectedRoute>
-              <div className="min-h-screen bg-background">
-                <Navigation />
-                <main>
-                  <Analytics />
-                </main>
-              </div>
+              <AppLayout>
+                <Analytics />
+              </AppLayout>
             </ProtectedRoute>
           } />
           <Route path="/calendar" element={
             <ProtectedRoute>
-              <div className="min-h-screen bg-background">
-                <Navigation />
-                <main>
-                  <Calendar />
-                </main>
-              </div>
+              <AppLayout>
+                <Calendar />
+              </AppLayout>
             </ProtectedRoute>
           } />
           <Route path="/settings" element={
             <ProtectedRoute>
-              <div className="min-h-screen bg-background">
-                <Navigation />
-                <main>
-                  <Settings />
-                </main>
-              </div>
+              <AppLayout>
+                <Settings />
+              </AppLayout>
             </ProtectedRoute>
           } />
           <Route path="*" element={<NotFound />} />
