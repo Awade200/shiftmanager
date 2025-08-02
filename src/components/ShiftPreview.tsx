@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ShiftRow } from '@/lib/shiftParser';
 import { useClientProfiles } from '@/hooks/useClientProfiles';
 import { useDuplicateHandling } from '@/hooks/useDuplicateHandling';
+import { useShifts } from '@/hooks/useShifts';
 import { DuplicateCheckResult, UpdateChoice } from '@/types/duplicateHandling';
 import { ShiftFormData } from '@/types/shift';
 import DuplicateHandlingModal from './DuplicateHandlingModal';
@@ -38,6 +39,7 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
   
   const { findClientLocation, saveClientProfile } = useClientProfiles();
   const { checkForDuplicates, processShiftsWithChoices, isProcessing } = useDuplicateHandling();
+  const { settings } = useShifts();
 
   // Generate unique IDs for shifts
   const shiftsWithIds = useMemo(() => {
@@ -185,7 +187,7 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
       endTime: shift.endTime,
       clientName: shift.clientName,
       location: shift.clientName ? findClientLocation(shift.clientName) || '' : '',
-      hourlyRate: 15, // Default rate, should be configurable
+      hourlyRate: settings.defaultHourlyRate,
       isPaid: false
     }));
 
@@ -213,7 +215,7 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
       endTime: shift.endTime,
       clientName: shift.clientName,
       location: shift.clientName ? findClientLocation(shift.clientName) || '' : '',
-      hourlyRate: 15, // Default rate, should be configurable
+      hourlyRate: settings.defaultHourlyRate,
       isPaid: false
     }));
 

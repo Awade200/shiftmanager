@@ -10,6 +10,7 @@ interface MobileAuthUser {
 export const useMobileAuth = () => {
   const [user, setUser] = useState<MobileAuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastActivity, setLastActivity] = useState(Date.now());
 
   useEffect(() => {
     // Check if user is logged in (stored in localStorage)
@@ -19,7 +20,29 @@ export const useMobileAuth = () => {
       setUser(userData);
     }
     setLoading(false);
-  }, []);
+
+    // Activity tracking for auto-logout
+    const updateActivity = () => setLastActivity(Date.now());
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    
+    events.forEach(event => {
+      document.addEventListener(event, updateActivity, true);
+    });
+
+    // Auto-logout timer (30 minutes = 1800000ms)
+    const logoutTimer = setInterval(() => {
+      if (user && Date.now() - lastActivity > 1800000) {
+        signOut();
+      }
+    }, 60000); // Check every minute
+
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, updateActivity, true);
+      });
+      clearInterval(logoutTimer);
+    };
+  }, [user, lastActivity]);
 
   const hashPin = async (pin: string): Promise<string> => {
     const encoder = new TextEncoder();

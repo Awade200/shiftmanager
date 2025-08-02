@@ -10,6 +10,7 @@ export interface ShiftRow {
   startTime: string;
   endTime: string;
   hours: number;
+  hourlyRate?: number; // Add hourlyRate to automatically apply default rate
   sourceType: 'paste' | 'pdf' | 'ocr';
   rawLines: string[];
   hoursCorrected?: boolean;

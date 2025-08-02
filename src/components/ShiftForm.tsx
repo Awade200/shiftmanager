@@ -114,6 +114,16 @@ const ShiftForm = ({ onSubmit, initialData, submitLabel = "Add Shift" }: ShiftFo
     }
   };
 
+  // Update form with latest default hourly rate when settings change
+  useEffect(() => {
+    if (!initialData?.hourlyRate) {
+      setFormData(prev => ({
+        ...prev,
+        hourlyRate: settings.defaultHourlyRate
+      }));
+    }
+  }, [settings.defaultHourlyRate, initialData?.hourlyRate]);
+
   return (
     <Card className="shadow-card">
       <CardHeader>
