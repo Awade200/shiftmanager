@@ -61,9 +61,9 @@ const navItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, isMobile } = useSidebar();
   const location = useLocation();
-  const collapsed = state === "collapsed";
+  const collapsed = state === "collapsed" && !isMobile;
 
   const isGroupActive = (items?: NavItem[]) => 
     items?.some(item => location.pathname === item.path) || false;
@@ -141,7 +141,7 @@ export function AppSidebar() {
         >
           <Link to={item.path!}>
             <Icon className="w-4 h-4" />
-            {!collapsed && <span>{item.label}</span>}
+            <span className={cn(collapsed && !isMobile && "sr-only")}>{item.label}</span>
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
