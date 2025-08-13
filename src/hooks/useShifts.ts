@@ -12,7 +12,7 @@ interface Settings {
 }
 
 const defaultSettings: Settings = {
-  defaultHourlyRate: 12.00,
+  defaultHourlyRate: 12.21,
   autoSaveClientLocations: true,
   useAnonymization: false,
 };
@@ -386,6 +386,50 @@ export const useShifts = () => {
     setSettings(prev => ({ ...prev, ...newSettings }));
   };
 
+  const updateAllShiftsHourlyRate = async (newRate: number): Promise<boolean> => {
+    if (!user?.mobile_number) {
+      throw new Error('User must be logged in to update shifts');
+    }
+
+    try {
+      // Update each shift individually with proper recalculation
+      const updatePromises = shifts.map(shift => {
+        const newEarnings = shift.duration * newRate;
+        return supabase
+          .from('shifts')
+          .update({ 
+            hourly_rate: newRate,
+            earnings: newEarnings
+          })
+          .eq('id', shift.id);
+      });
+
+      const results = await Promise.all(updatePromises);
+      const hasErrors = results.some(result => result.error);
+      
+      if (hasErrors) {
+        console.error('Some shifts failed to update');
+        const errorDetails = results.filter(result => result.error).map(result => result.error);
+        console.error('Error details:', errorDetails);
+        return false;
+      }
+
+      // Update local state
+      setShifts(prev => prev.map(shift => ({
+        ...shift,
+        hourlyRate: newRate,
+        earnings: shift.duration * newRate,
+        updatedAt: new Date().toISOString()
+      })));
+
+      console.log(`✅ Successfully updated ${shifts.length} shifts to £${newRate}/hour`);
+      return true;
+    } catch (error) {
+      console.error('Error updating all shifts hourly rate:', error);
+      return false;
+    }
+  };
+
   return {
     shifts,
     settings,
@@ -398,5 +442,6 @@ export const useShifts = () => {
     getShiftStats,
     exportToCSV,
     updateSettings,
+    updateAllShiftsHourlyRate,
   };
 };

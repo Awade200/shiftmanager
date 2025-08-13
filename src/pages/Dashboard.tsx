@@ -11,20 +11,50 @@ import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
-  const { getShiftStats, settings, updateSettings, exportToCSV } = useShifts();
+  const { getShiftStats, settings, updateSettings, exportToCSV, updateAllShiftsHourlyRate } = useShifts();
   const [newHourlyRate, setNewHourlyRate] = useState(settings.defaultHourlyRate.toString());
   const { toast } = useToast();
   
   const stats = getShiftStats();
 
-  const handleUpdateHourlyRate = () => {
+  const handleUpdateHourlyRate = async () => {
     const rate = parseFloat(newHourlyRate);
     if (rate > 0) {
+      // Update the default rate for future shifts
       updateSettings({ defaultHourlyRate: rate });
       toast({
         title: "Hourly rate updated",
-        description: `Default hourly rate set to £${rate.toFixed(2)}`,
+        description: `Default hourly rate set to £${rate.toFixed(2)} for future shifts`,
       });
+    }
+  };
+
+  const handleUpdateAllShiftsRate = async () => {
+    const rate = parseFloat(newHourlyRate);
+    if (rate > 0) {
+      try {
+        const success = await updateAllShiftsHourlyRate(rate);
+        if (success) {
+          // Also update the default for future shifts
+          updateSettings({ defaultHourlyRate: rate });
+          toast({
+            title: "All shifts updated!",
+            description: `Updated all existing shifts and set default rate to £${rate.toFixed(2)}`,
+          });
+        } else {
+          toast({
+            title: "Update failed",
+            description: "Could not update all shifts. Please try again.",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        toast({
+          title: "Update failed",
+          description: "Could not update all shifts. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -112,22 +142,32 @@ const Dashboard = () => {
       {/* Compact Settings */}
       <Card className="shadow-card">
         <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4 items-end">
-            <div className="flex-1">
-              <Label htmlFor="hourlyRate" className="text-sm font-medium">Default Hourly Rate (£)</Label>
-              <Input
-                id="hourlyRate"
-                type="number"
-                step="0.01"
-                min="0"
-                value={newHourlyRate}
-                onChange={(e) => setNewHourlyRate(e.target.value)}
-                className="mt-1"
-              />
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-4 items-end">
+              <div className="flex-1">
+                <Label htmlFor="hourlyRate" className="text-sm font-medium">Default Hourly Rate (£)</Label>
+                <Input
+                  id="hourlyRate"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={newHourlyRate}
+                  onChange={(e) => setNewHourlyRate(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleUpdateHourlyRate} variant="outline" size="sm">
+                  Set for Future
+                </Button>
+                <Button onClick={handleUpdateAllShiftsRate} variant="default" size="sm">
+                  Update All Shifts
+                </Button>
+              </div>
             </div>
-            <Button onClick={handleUpdateHourlyRate} variant="outline" size="sm">
-              Update Rate
-            </Button>
+            <p className="text-xs text-muted-foreground">
+              "Set for Future" applies the rate to new shifts only. "Update All Shifts" changes all existing and future shifts to this rate.
+            </p>
           </div>
         </CardContent>
       </Card>
