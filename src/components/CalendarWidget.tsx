@@ -24,24 +24,7 @@ export default function CalendarWidget() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedShifts, setSelectedShifts] = useState<DayShift[]>([]);
 
-  // Add defensive programming for shifts data
-  if (!shifts || !Array.isArray(shifts) || shifts.length === 0) {
-    return (
-      <Card className="shadow-card border-dashed border-2">
-        <CardContent className="text-center py-8">
-          <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">No shifts recorded yet</h3>
-          <p className="text-muted-foreground mb-4">Start by adding your first shift manually or upload a rota image</p>
-          <div className="flex flex-col sm:flex-row gap-2 justify-center">
-            <Button asChild>
-              <Link to="/add-shift">Add First Shift</Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
+  // Move useMemo BEFORE any conditional returns to follow Rules of Hooks
   const { calendarDays, monthStats } = useMemo(() => {
     // Add safety check for shifts
     if (!shifts || !Array.isArray(shifts)) {
@@ -92,6 +75,24 @@ export default function CalendarWidget() {
 
     return { calendarDays, monthStats };
   }, [shifts, currentDate]);
+
+  // NOW check for empty state AFTER all hooks
+  if (!shifts || !Array.isArray(shifts) || shifts.length === 0) {
+    return (
+      <Card className="shadow-card border-dashed border-2">
+        <CardContent className="text-center py-8">
+          <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">No shifts recorded yet</h3>
+          <p className="text-muted-foreground mb-4">Start by adding your first shift manually or upload a rota image</p>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            <Button asChild>
+              <Link to="/add-shift">Add First Shift</Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const handleDateClick = (day: any) => {
     setSelectedDate(day.date);
