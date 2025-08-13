@@ -24,7 +24,8 @@ export default function CalendarWidget() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedShifts, setSelectedShifts] = useState<DayShift[]>([]);
 
-  if (shifts.length === 0) {
+  // Add defensive programming for shifts data
+  if (!shifts || !Array.isArray(shifts) || shifts.length === 0) {
     return (
       <Card className="shadow-card border-dashed border-2">
         <CardContent className="text-center py-8">
@@ -42,6 +43,14 @@ export default function CalendarWidget() {
   }
 
   const { calendarDays, monthStats } = useMemo(() => {
+    // Add safety check for shifts
+    if (!shifts || !Array.isArray(shifts)) {
+      return {
+        calendarDays: [],
+        monthStats: { totalHours: 0, totalEarnings: 0, totalShifts: 0, activeDays: 0 }
+      };
+    }
+
     const start = startOfMonth(currentDate);
     const end = endOfMonth(currentDate);
     const days = eachDayOfInterval({ start, end });
