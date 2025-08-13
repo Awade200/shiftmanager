@@ -55,7 +55,7 @@ const navItems: NavItem[] = [
       { path: '/grouped-shifts', label: 'Grouped Shifts', icon: Users },
     ]
   },
-  { path: '/calendar', label: 'Calendar', icon: CalendarDays },
+  
   { path: '/analytics', label: 'Analytics', icon: BarChart3 },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];

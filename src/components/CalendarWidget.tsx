@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ChevronLeft, ChevronRight, Clock, PoundSterling, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, MapPin } from 'lucide-react';
 import { useShifts } from '@/hooks/useShifts';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, getDay } from 'date-fns';
 
@@ -17,13 +17,13 @@ interface DayShift {
   location?: string;
 }
 
-export default function Calendar() {
+export default function CalendarWidget() {
   const { shifts } = useShifts();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedShifts, setSelectedShifts] = useState<DayShift[]>([]);
 
-  const { calendarDays, monthShifts } = useMemo(() => {
+  const { calendarDays, monthStats } = useMemo(() => {
     const start = startOfMonth(currentDate);
     const end = endOfMonth(currentDate);
     const days = eachDayOfInterval({ start, end });
@@ -55,7 +55,15 @@ export default function Calendar() {
       };
     });
 
-    return { calendarDays, monthShifts };
+    // Calculate stats for current month
+    const monthStats = {
+      totalHours: monthShifts.reduce((sum, shift) => sum + shift.duration, 0),
+      totalEarnings: monthShifts.reduce((sum, shift) => sum + shift.earnings, 0),
+      totalShifts: monthShifts.length,
+      activeDays: new Set(monthShifts.map(shift => shift.date)).size
+    };
+
+    return { calendarDays, monthStats };
   }, [shifts, currentDate]);
 
   const handleDateClick = (day: any) => {
@@ -69,38 +77,15 @@ export default function Calendar() {
 
   const getDateColor = (totalHours: number) => {
     if (totalHours === 0) return '';
-    if (totalHours <= 4) return 'bg-blue-100 text-blue-900';
-    if (totalHours <= 8) return 'bg-green-100 text-green-900';
-    return 'bg-purple-100 text-purple-900';
+    if (totalHours <= 4) return 'bg-blue-100 text-blue-900 dark:bg-blue-900/20 dark:text-blue-300';
+    if (totalHours <= 8) return 'bg-green-100 text-green-900 dark:bg-green-900/20 dark:text-green-300';
+    return 'bg-purple-100 text-purple-900 dark:bg-purple-900/20 dark:text-purple-300';
   };
 
   const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  // Calculate stats for current month
-  const monthStats = {
-    totalHours: monthShifts.reduce((sum, shift) => sum + shift.duration, 0),
-    totalEarnings: monthShifts.reduce((sum, shift) => sum + shift.earnings, 0),
-    totalShifts: monthShifts.length,
-    activeDays: new Set(monthShifts.map(shift => shift.date)).size
-  };
-
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Shift Calendar</h1>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => navigateMonth('prev')}>
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <h2 className="text-xl font-semibold min-w-[200px] text-center">
-            {format(currentDate, 'MMMM yyyy')}
-          </h2>
-          <Button variant="outline" size="sm" onClick={() => navigateMonth('next')}>
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-
+    <div className="space-y-6">
       {/* Month Stats */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
@@ -129,8 +114,24 @@ export default function Calendar() {
         </Card>
       </div>
 
-      {/* Calendar Grid */}
+      {/* Calendar */}
       <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Shift Calendar</CardTitle>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => navigateMonth('prev')}>
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <h3 className="text-lg font-medium min-w-[150px] text-center">
+                {format(currentDate, 'MMMM yyyy')}
+              </h3>
+              <Button variant="outline" size="sm" onClick={() => navigateMonth('next')}>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
         <CardContent className="p-6">
           <div className="grid grid-cols-7 gap-2 mb-4">
             {weekDays.map(day => (
@@ -143,13 +144,13 @@ export default function Calendar() {
           <div className="grid grid-cols-7 gap-2">
             {/* Empty cells for days before month starts */}
             {Array.from({ length: getDay(calendarDays[0]?.date) === 0 ? 6 : getDay(calendarDays[0]?.date) - 1 }).map((_, i) => (
-              <div key={`empty-${i}`} className="h-24"></div>
+              <div key={`empty-${i}`} className="h-20"></div>
             ))}
             
             {calendarDays.map((day, index) => (
               <div
                 key={index}
-                className={`h-24 border rounded-lg p-2 cursor-pointer transition-colors hover:bg-muted/50 ${
+                className={`h-20 border rounded-lg p-2 cursor-pointer transition-colors hover:bg-muted/50 ${
                   getDateColor(day.totalHours)
                 } ${isSameDay(day.date, new Date()) ? 'ring-2 ring-primary' : ''}`}
                 onClick={() => handleDateClick(day)}
@@ -161,14 +162,14 @@ export default function Calendar() {
                       {day.totalHours.toFixed(1)}h
                     </div>
                     <div className="flex flex-wrap gap-1">
-                      {day.shifts.slice(0, 2).map((shift, i) => (
+                      {day.shifts.slice(0, 1).map((shift, i) => (
                         <Badge key={i} variant="secondary" className="text-xs px-1">
                           {shift.clientName.split(' ')[0]}
                         </Badge>
                       ))}
-                      {day.shifts.length > 2 && (
+                      {day.shifts.length > 1 && (
                         <Badge variant="outline" className="text-xs px-1">
-                          +{day.shifts.length - 2}
+                          +{day.shifts.length - 1}
                         </Badge>
                       )}
                     </div>
@@ -185,15 +186,15 @@ export default function Calendar() {
         <CardContent className="p-4">
           <div className="flex items-center gap-6 text-sm">
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-blue-100 rounded"></div>
+              <div className="w-4 h-4 bg-blue-100 dark:bg-blue-900/20 rounded"></div>
               <span>1-4 hours</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-green-100 rounded"></div>
+              <div className="w-4 h-4 bg-green-100 dark:bg-green-900/20 rounded"></div>
               <span>5-8 hours</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-purple-100 rounded"></div>
+              <div className="w-4 h-4 bg-purple-100 dark:bg-purple-900/20 rounded"></div>
               <span>9+ hours</span>
             </div>
             <div className="flex items-center gap-2">

@@ -2,6 +2,7 @@ import { useShifts } from '@/hooks/useShifts';
 import { useTaxCalculation } from '@/hooks/useTaxCalculation';
 import StatsCard from '@/components/StatsCard';
 import TaxCalculator from '@/components/TaxCalculator';
+import CalendarWidget from '@/components/CalendarWidget';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -169,8 +170,10 @@ const Dashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Quick Actions */}
-      {stats.totalShifts === 0 && (
+      {/* Calendar View */}
+      {stats.totalShifts > 0 ? (
+        <CalendarWidget />
+      ) : (
         <Card className="shadow-card border-dashed border-2">
           <CardContent className="text-center py-8">
             <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
