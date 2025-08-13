@@ -1,7 +1,5 @@
 import { useShifts } from '@/hooks/useShifts';
-import { useTaxCalculation } from '@/hooks/useTaxCalculation';
 import StatsCard from '@/components/StatsCard';
-import TaxCalculator from '@/components/TaxCalculator';
 import CalendarWidget from '@/components/CalendarWidget';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,18 +12,10 @@ import { useToast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
   const { getShiftStats, settings, updateSettings, exportToCSV } = useShifts();
-  const { taxSettings, calculateTax } = useTaxCalculation();
   const [newHourlyRate, setNewHourlyRate] = useState(settings.defaultHourlyRate.toString());
   const { toast } = useToast();
   
   const stats = getShiftStats();
-  
-  // Calculate tax for current period's earnings
-  const grossPay = taxSettings.payFrequency === 'weekly' 
-    ? stats.totalEarnings 
-    : stats.totalEarnings; // For simplicity, using total earnings
-  
-  const taxCalculation = calculateTax(grossPay);
 
   const handleUpdateHourlyRate = () => {
     const rate = parseFloat(newHourlyRate);
