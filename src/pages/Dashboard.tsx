@@ -65,7 +65,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-4 space-y-6">
+    <div className="max-w-6xl mx-auto p-4 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
@@ -85,7 +85,10 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Stats Grid */}
+      {/* Calendar Widget - Always at the top */}
+      <CalendarWidget />
+
+      {/* Essential Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
           title="Total Hours"
@@ -116,43 +119,12 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* Tax Calculator */}
-      {stats.totalEarnings > 0 && (
-        <TaxCalculator 
-          grossPay={grossPay}
-          className="shadow-card"
-        />
-      )}
-
-      {/* Net Pay Summary */}
-      {stats.totalEarnings > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <StatsCard
-            title={`Estimated Net Pay (${taxSettings.payFrequency})`}
-            value={`£${taxCalculation.netPay.toFixed(2)}`}
-            subtitle={`After tax & NI deductions`}
-            icon={<Wallet className="w-4 h-4" />}
-            variant="success"
-          />
-          <StatsCard
-            title="Total Deductions"
-            value={`£${taxCalculation.totalDeductions.toFixed(2)}`}
-            subtitle={`Tax: £${taxCalculation.incomeTax.toFixed(2)} | NI: £${taxCalculation.nationalInsurance.toFixed(2)}`}
-            icon={<DollarSign className="w-4 h-4" />}
-            variant="warning"
-          />
-        </div>
-      )}
-
-      {/* Settings */}
+      {/* Compact Settings */}
       <Card className="shadow-card">
-        <CardHeader>
-          <CardTitle className="text-lg">Settings</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-4 items-end">
             <div className="flex-1">
-              <Label htmlFor="hourlyRate">Default Hourly Rate (£)</Label>
+              <Label htmlFor="hourlyRate" className="text-sm font-medium">Default Hourly Rate (£)</Label>
               <Input
                 id="hourlyRate"
                 type="number"
@@ -163,30 +135,12 @@ const Dashboard = () => {
                 className="mt-1"
               />
             </div>
-            <Button onClick={handleUpdateHourlyRate} variant="outline">
+            <Button onClick={handleUpdateHourlyRate} variant="outline" size="sm">
               Update Rate
             </Button>
           </div>
         </CardContent>
       </Card>
-
-      {/* Calendar View */}
-      {stats.totalShifts > 0 ? (
-        <CalendarWidget />
-      ) : (
-        <Card className="shadow-card border-dashed border-2">
-          <CardContent className="text-center py-8">
-            <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">No shifts recorded yet</h3>
-            <p className="text-muted-foreground mb-4">Start by adding your first shift manually or upload a rota image</p>
-            <div className="flex flex-col sm:flex-row gap-2 justify-center">
-              <Button asChild>
-                <Link to="/add-shift">Add First Shift</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };

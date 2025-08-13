@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ChevronLeft, ChevronRight, Clock, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, MapPin, Calendar } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useShifts } from '@/hooks/useShifts';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, getDay } from 'date-fns';
 
@@ -22,6 +23,23 @@ export default function CalendarWidget() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedShifts, setSelectedShifts] = useState<DayShift[]>([]);
+
+  if (shifts.length === 0) {
+    return (
+      <Card className="shadow-card border-dashed border-2">
+        <CardContent className="text-center py-8">
+          <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">No shifts recorded yet</h3>
+          <p className="text-muted-foreground mb-4">Start by adding your first shift manually or upload a rota image</p>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            <Button asChild>
+              <Link to="/add-shift">Add First Shift</Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const { calendarDays, monthStats } = useMemo(() => {
     const start = startOfMonth(currentDate);
@@ -91,19 +109,19 @@ export default function CalendarWidget() {
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold">{monthStats.totalHours.toFixed(1)}h</div>
-            <div className="text-sm text-muted-foreground">Total Hours</div>
+            <div className="text-sm text-muted-foreground">Month Hours</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold">£{monthStats.totalEarnings.toFixed(2)}</div>
-            <div className="text-sm text-muted-foreground">Total Earnings</div>
+            <div className="text-sm text-muted-foreground">Month Earnings</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold">{monthStats.totalShifts}</div>
-            <div className="text-sm text-muted-foreground">Total Shifts</div>
+            <div className="text-sm text-muted-foreground">Month Shifts</div>
           </CardContent>
         </Card>
         <Card>
