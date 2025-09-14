@@ -6,7 +6,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { DuplicateCheckResult, UpdateChoice } from '@/types/duplicateHandling';
-import { AlertTriangle, Clock, RotateCcw, Plus, X } from 'lucide-react';
+import { WorkloadWarningsDisplay } from './WorkloadWarningsDisplay';
+import { AlertTriangle, Clock, RotateCcw, Plus, X, CheckCircle } from 'lucide-react';
 
 interface DuplicateHandlingModalProps {
   isOpen: boolean;
@@ -23,6 +24,15 @@ export default function DuplicateHandlingModal({
 }: DuplicateHandlingModalProps) {
   const [choices, setChoices] = useState<Record<string, string>>({});
 
+  // Separate conflicts and workload warnings
+  const timeConflicts = conflicts.filter(c => 
+    c.status === 'duplicate' || c.status === 'potential_update'
+  );
+  
+  const workloadWarnings = conflicts.filter(c => 
+    c.workloadWarnings && c.workloadWarnings.length > 0
+  );
+
   const handleChoiceChange = (shiftId: string, action: string) => {
     setChoices(prev => ({ ...prev, [shiftId]: action }));
   };
@@ -30,7 +40,7 @@ export default function DuplicateHandlingModal({
   const handleSubmit = () => {
     const updateChoices: UpdateChoice[] = conflicts.map(conflict => ({
       shiftId: conflict.id,
-      action: (choices[conflict.id] || 'update') as 'update' | 'keep_both' | 'skip',
+      action: (choices[conflict.id] || 'proceed_with_warning') as 'update' | 'keep_both' | 'skip' | 'proceed_with_warning',
     }));
     
     onChoicesMade(updateChoices);
@@ -51,91 +61,132 @@ export default function DuplicateHandlingModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-yellow-500" />
-            Time Conflicts Detected
+            {timeConflicts.length > 0 ? 'Time Conflicts Detected' : 'Workload Analysis'}
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Some shifts have different times than existing entries. Choose how to handle each conflict:
+            {timeConflicts.length > 0 
+              ? 'Some shifts have different times than existing entries. Choose how to handle each conflict:'
+              : 'Potential workload concerns detected. Review the analysis below:'
+            }
           </p>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {conflicts.map((conflict) => (
-            <Card key={conflict.id} className="border-yellow-200">
-              <CardContent className="p-4">
-                <div className="mb-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="outline">
-                      {formatDate(conflict.newShift.date)}
-                    </Badge>
-                    <span className="font-medium">{conflict.newShift.clientName}</span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="bg-red-50 p-3 rounded">
-                      <div className="font-medium text-red-700 mb-1">Existing Shift</div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        {conflict.existingShift?.startTime} - {conflict.existingShift?.endTime}
-                      </div>
-                    </div>
-                    
-                    <div className="bg-green-50 p-3 rounded">
-                      <div className="font-medium text-green-700 mb-1">New Entry</div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        {conflict.newShift.startTime} - {conflict.newShift.endTime}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+        <div className="space-y-6">
+          {/* Workload Warnings Section */}
+          {workloadWarnings.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+                Schedule Analysis
+              </h3>
+              <WorkloadWarningsDisplay 
+                warnings={workloadWarnings.flatMap(c => c.workloadWarnings || [])}
+              />
+            </div>
+          )}
 
-                <RadioGroup
-                  value={choices[conflict.id] || 'update'}
-                  onValueChange={(value) => handleChoiceChange(conflict.id, value)}
-                  className="space-y-2"
-                >
-                  <div className="flex items-center space-x-2 p-2 rounded hover:bg-blue-50">
-                    <RadioGroupItem value="update" id={`update-${conflict.id}`} />
-                    <Label htmlFor={`update-${conflict.id}`} className="flex items-center gap-2 cursor-pointer">
-                      <RotateCcw className="w-4 h-4 text-blue-500" />
-                      <div>
-                        <div className="font-medium">Update existing hours</div>
-                        <div className="text-sm text-muted-foreground">
-                          Change to {conflict.newShift.startTime} - {conflict.newShift.endTime}
+          {/* Time Conflicts Section */}
+          {timeConflicts.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-red-500" />
+                Time Conflicts
+              </h3>
+              <div className="space-y-4">
+                {timeConflicts.map((conflict) => (
+                  <Card key={conflict.id} className="border-yellow-200">
+                    <CardContent className="p-4">
+                      <div className="mb-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="outline">
+                            {formatDate(conflict.newShift.date)}
+                          </Badge>
+                          <span className="font-medium">{conflict.newShift.clientName}</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div className="bg-red-50 p-3 rounded">
+                            <div className="font-medium text-red-700 mb-1">Existing Shift</div>
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              {conflict.existingShift?.startTime} - {conflict.existingShift?.endTime}
+                            </div>
+                          </div>
+                          
+                          <div className="bg-green-50 p-3 rounded">
+                            <div className="font-medium text-green-700 mb-1">New Entry</div>
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              {conflict.newShift.startTime} - {conflict.newShift.endTime}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </Label>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2 p-2 rounded hover:bg-green-50">
-                    <RadioGroupItem value="keep_both" id={`keep-${conflict.id}`} />
-                    <Label htmlFor={`keep-${conflict.id}`} className="flex items-center gap-2 cursor-pointer">
-                      <Plus className="w-4 h-4 text-green-500" />
-                      <div>
-                        <div className="font-medium">Keep both shifts</div>
-                        <div className="text-sm text-muted-foreground">
-                          Store as separate shift blocks
+
+                      <RadioGroup
+                        value={choices[conflict.id] || 'update'}
+                        onValueChange={(value) => handleChoiceChange(conflict.id, value)}
+                        className="space-y-2"
+                      >
+                        <div className="flex items-center space-x-2 p-2 rounded hover:bg-blue-50">
+                          <RadioGroupItem value="update" id={`update-${conflict.id}`} />
+                          <Label htmlFor={`update-${conflict.id}`} className="flex items-center gap-2 cursor-pointer">
+                            <RotateCcw className="w-4 h-4 text-blue-500" />
+                            <div>
+                              <div className="font-medium">Update existing hours</div>
+                              <div className="text-sm text-muted-foreground">
+                                Change to {conflict.newShift.startTime} - {conflict.newShift.endTime}
+                              </div>
+                            </div>
+                          </Label>
                         </div>
-                      </div>
-                    </Label>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2 p-2 rounded hover:bg-gray-50">
-                    <RadioGroupItem value="skip" id={`skip-${conflict.id}`} />
-                    <Label htmlFor={`skip-${conflict.id}`} className="flex items-center gap-2 cursor-pointer">
-                      <X className="w-4 h-4 text-gray-500" />
-                      <div>
-                        <div className="font-medium">Skip this new entry</div>
-                        <div className="text-sm text-muted-foreground">
-                          Keep existing shift unchanged
+                        
+                        <div className="flex items-center space-x-2 p-2 rounded hover:bg-green-50">
+                          <RadioGroupItem value="keep_both" id={`keep-${conflict.id}`} />
+                          <Label htmlFor={`keep-${conflict.id}`} className="flex items-center gap-2 cursor-pointer">
+                            <Plus className="w-4 h-4 text-green-500" />
+                            <div>
+                              <div className="font-medium">Keep both shifts</div>
+                              <div className="text-sm text-muted-foreground">
+                                Store as separate shift blocks
+                              </div>
+                            </div>
+                          </Label>
                         </div>
-                      </div>
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </CardContent>
-            </Card>
-          ))}
+                        
+                        <div className="flex items-center space-x-2 p-2 rounded hover:bg-gray-50">
+                          <RadioGroupItem value="skip" id={`skip-${conflict.id}`} />
+                          <Label htmlFor={`skip-${conflict.id}`} className="flex items-center gap-2 cursor-pointer">
+                            <X className="w-4 h-4 text-gray-500" />
+                            <div>
+                              <div className="font-medium">Skip this new entry</div>
+                              <div className="text-sm text-muted-foreground">
+                                Keep existing shift unchanged
+                              </div>
+                            </div>
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Proceed with warnings for non-conflict items */}
+          {workloadWarnings.length > 0 && timeConflicts.length === 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-amber-700 mb-2">
+                <CheckCircle className="w-5 h-5" />
+                <span className="font-medium">Ready to proceed</span>
+              </div>
+              <p className="text-sm text-amber-600">
+                The shifts can be saved with the workload concerns noted above. 
+                Review the suggestions and proceed when ready.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 pt-4">
@@ -143,7 +194,7 @@ export default function DuplicateHandlingModal({
             Cancel
           </Button>
           <Button onClick={handleSubmit}>
-            Apply Choices
+            {timeConflicts.length > 0 ? 'Apply Choices' : 'Proceed with Save'}
           </Button>
         </div>
       </DialogContent>

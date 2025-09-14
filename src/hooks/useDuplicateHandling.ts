@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { DuplicateCheckResult, UpdateChoice, SaveSummary } from '@/types/duplicateHandling';
+import { DuplicateCheckResult, UpdateChoice, SaveSummary, WorkloadWarning } from '@/types/duplicateHandling';
 import { ShiftFormData } from '@/types/shift';
 import { useClientProfiles } from './useClientProfiles';
 
@@ -23,11 +23,111 @@ export const useDuplicateHandling = () => {
     return (end.getTime() - start.getTime()) / (1000 * 60 * 60);
   };
 
+  const analyzeWorkload = (shifts: ShiftFormData[]): WorkloadWarning[] => {
+    const warnings: WorkloadWarning[] = [];
+    const shiftsByDate = new Map<string, ShiftFormData[]>();
+    
+    // Group shifts by date
+    shifts.forEach(shift => {
+      if (!shiftsByDate.has(shift.date)) {
+        shiftsByDate.set(shift.date, []);
+      }
+      shiftsByDate.get(shift.date)!.push(shift);
+    });
+
+    // Analyze each day
+    shiftsByDate.forEach((dayShifts, date) => {
+      const sortedShifts = dayShifts.sort((a, b) => 
+        a.startTime.localeCompare(b.startTime)
+      );
+
+      let totalDayHours = 0;
+      const shortShifts: string[] = [];
+      const rapidTransitions: string[] = [];
+      
+      sortedShifts.forEach((shift, index) => {
+        const duration = calculateDuration(shift.startTime, shift.endTime);
+        totalDayHours += duration;
+        
+        // Check for short shifts (less than 1 hour)
+        if (duration < 1) {
+          shortShifts.push(`${shift.clientName} (${duration.toFixed(1)}h)`);
+        }
+        
+        // Check for rapid client transitions (less than 15 mins between different clients)
+        if (index > 0) {
+          const prevShift = sortedShifts[index - 1];
+          if (prevShift.clientName !== shift.clientName) {
+            const prevEnd = new Date(`2000-01-01T${prevShift.endTime}:00`);
+            const currentStart = new Date(`2000-01-01T${shift.startTime}:00`);
+            const timeDiff = (currentStart.getTime() - prevEnd.getTime()) / (1000 * 60);
+            
+            if (timeDiff >= 0 && timeDiff < 15) {
+              rapidTransitions.push(`${prevShift.clientName} → ${shift.clientName} (${timeDiff}min gap)`);
+            }
+          }
+        }
+      });
+
+      // Generate warnings for this day
+      if (shortShifts.length >= 3) {
+        warnings.push({
+          type: 'fragmented_schedule',
+          severity: 'high',
+          message: `${date}: ${shortShifts.length} very short shifts detected`,
+          affectedShifts: shortShifts,
+          suggestions: ['Consider combining consecutive shifts for the same client', 'Review if 30-minute shifts are practical']
+        });
+      } else if (shortShifts.length > 0) {
+        warnings.push({
+          type: 'short_shift',
+          severity: shortShifts.length > 1 ? 'medium' : 'low',
+          message: `${date}: ${shortShifts.length} short shift(s) under 1 hour`,
+          affectedShifts: shortShifts,
+          suggestions: ['Verify if travel time is accounted for', 'Consider minimum shift duration policies']
+        });
+      }
+
+      if (rapidTransitions.length > 0) {
+        warnings.push({
+          type: 'rapid_transitions',
+          severity: rapidTransitions.length > 2 ? 'high' : 'medium',
+          message: `${date}: ${rapidTransitions.length} rapid client transitions with minimal travel time`,
+          affectedShifts: rapidTransitions,
+          suggestions: ['Add buffer time between different clients', 'Consider geographic proximity when scheduling']
+        });
+      }
+
+      if (sortedShifts.length > 6) {
+        warnings.push({
+          type: 'intensive_day',
+          severity: sortedShifts.length > 8 ? 'high' : 'medium',
+          message: `${date}: ${sortedShifts.length} separate shifts in one day`,
+          affectedShifts: sortedShifts.map(s => `${s.clientName} ${s.startTime}-${s.endTime}`),
+          suggestions: ['Review feasibility of managing this many shifts', 'Consider consolidating similar clients/locations']
+        });
+      }
+
+      if (totalDayHours > 12) {
+        warnings.push({
+          type: 'excessive_hours',
+          severity: totalDayHours > 16 ? 'high' : 'medium',
+          message: `${date}: ${totalDayHours.toFixed(1)} total hours scheduled`,
+          affectedShifts: [`Total: ${totalDayHours.toFixed(1)} hours`],
+          suggestions: ['Verify compliance with working time regulations', 'Ensure adequate rest periods']
+        });
+      }
+    });
+
+    return warnings;
+  };
+
   const checkForDuplicates = async (newShifts: ShiftFormData[]): Promise<DuplicateCheckResult[]> => {
     setIsProcessing(true);
     
     try {
       const results: DuplicateCheckResult[] = [];
+      const workloadWarnings = analyzeWorkload(newShifts);
 
       for (const newShift of newShifts) {
         const shiftKey = generateShiftKey(newShift.date, newShift.startTime, newShift.endTime, newShift.clientName);
@@ -116,11 +216,6 @@ export const useDuplicateHandling = () => {
             // Check for overlap: new shift starts before existing ends AND new shift ends after existing starts
             const hasOverlap = newStart < existingEnd && newEnd > existingStart;
             
-            console.log(`Checking overlap for ${newShift.clientName} on ${newShift.date}:`);
-            console.log(`  New: ${newStart.toTimeString()} - ${newEnd.toTimeString()}`);
-            console.log(`  Existing: ${existingStart.toTimeString()} - ${existingEnd.toTimeString()}`);
-            console.log(`  Has overlap: ${hasOverlap}`);
-            
             if (hasOverlap) {
               status = 'potential_update';
               conflicts = {
@@ -147,12 +242,21 @@ export const useDuplicateHandling = () => {
           }
         }
 
+        // Add shift-specific workload warnings
+        const shiftWarnings = workloadWarnings.filter(warning => 
+          warning.affectedShifts.some(affected => 
+            affected.includes(newShift.clientName) || 
+            affected.includes(`${newShift.startTime}-${newShift.endTime}`)
+          )
+        );
+
         results.push({
           id: Math.random().toString(36).substr(2, 9),
           status,
           existingShift,
           newShift,
           conflicts,
+          workloadWarnings: shiftWarnings.length > 0 ? shiftWarnings : undefined,
         });
       }
 
@@ -177,6 +281,14 @@ export const useDuplicateHandling = () => {
 
     const shiftsToInsert: any[] = [];
     const shiftsToUpdate: any[] = [];
+    
+    // Collect all workload warnings
+    const allWorkloadWarnings: WorkloadWarning[] = [];
+    duplicateResults.forEach(result => {
+      if (result.workloadWarnings) {
+        allWorkloadWarnings.push(...result.workloadWarnings);
+      }
+    });
 
     for (const result of duplicateResults) {
       const duration = calculateDuration(result.newShift.startTime, result.newShift.endTime);
@@ -281,6 +393,7 @@ export const useDuplicateHandling = () => {
       newHours,
       updatedHours,
       skippedHours,
+      workloadWarnings: allWorkloadWarnings,
     };
   };
 

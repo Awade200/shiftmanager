@@ -1,6 +1,14 @@
+export interface WorkloadWarning {
+  type: 'short_shift' | 'intensive_day' | 'rapid_transitions' | 'excessive_hours' | 'fragmented_schedule';
+  severity: 'low' | 'medium' | 'high';
+  message: string;
+  affectedShifts: string[];
+  suggestions?: string[];
+}
+
 export interface DuplicateCheckResult {
   id: string;
-  status: 'new' | 'duplicate' | 'potential_update' | 'needs_location';
+  status: 'new' | 'duplicate' | 'potential_update' | 'needs_location' | 'workload_warning';
   existingShift?: {
     id: string;
     startTime: string;
@@ -19,11 +27,12 @@ export interface DuplicateCheckResult {
     startTime?: boolean;
     endTime?: boolean;
   };
+  workloadWarnings?: WorkloadWarning[];
 }
 
 export interface UpdateChoice {
   shiftId: string;
-  action: 'update' | 'keep_both' | 'skip';
+  action: 'update' | 'keep_both' | 'skip' | 'proceed_with_warning';
 }
 
 export interface SaveSummary {
@@ -34,4 +43,5 @@ export interface SaveSummary {
   newHours: number;
   updatedHours: number;
   skippedHours: number;
+  workloadWarnings: WorkloadWarning[];
 }
