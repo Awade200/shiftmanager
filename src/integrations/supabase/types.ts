@@ -7,13 +7,103 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
   }
   public: {
     Tables: {
+      alawoye_activity_logs: {
+        Row: {
+          action_type: string
+          admin_id: string
+          client_id: string
+          consultation_id: string | null
+          created_at: string
+          description: string
+          id: string
+          prescription_id: string | null
+        }
+        Insert: {
+          action_type: string
+          admin_id: string
+          client_id: string
+          consultation_id?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          prescription_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          admin_id?: string
+          client_id?: string
+          consultation_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          prescription_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alawoye_activity_logs_admin_fk"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "egbg_admin_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alawoye_activity_logs_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "egbg_admin_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alawoye_activity_logs_client_fk"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "egbg_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alawoye_activity_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "egbg_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alawoye_activity_logs_consultation_fk"
+            columns: ["consultation_id"]
+            isOneToOne: false
+            referencedRelation: "egbg_consultations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alawoye_activity_logs_consultation_id_fkey"
+            columns: ["consultation_id"]
+            isOneToOne: false
+            referencedRelation: "egbg_consultations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alawoye_activity_logs_prescription_fk"
+            columns: ["prescription_id"]
+            isOneToOne: false
+            referencedRelation: "egbg_prescriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alawoye_activity_logs_prescription_id_fkey"
+            columns: ["prescription_id"]
+            isOneToOne: false
+            referencedRelation: "egbg_prescriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       batch_consumption: {
         Row: {
           batch_id: string
@@ -275,6 +365,7 @@ export type Database = {
           customer_name: string
           customer_phone: string
           delivery_fee: number
+          delivery_method: string | null
           id: string
           notes: string | null
           order_number: string
@@ -298,6 +389,7 @@ export type Database = {
           customer_name: string
           customer_phone: string
           delivery_fee?: number
+          delivery_method?: string | null
           id?: string
           notes?: string | null
           order_number: string
@@ -321,6 +413,7 @@ export type Database = {
           customer_name?: string
           customer_phone?: string
           delivery_fee?: number
+          delivery_method?: string | null
           id?: string
           notes?: string | null
           order_number?: string
@@ -384,6 +477,7 @@ export type Database = {
           name: string
           price: number
           sku: string | null
+          slug: string
           status: string
           stock_quantity: number
           tags: string[] | null
@@ -403,6 +497,7 @@ export type Database = {
           name: string
           price?: number
           sku?: string | null
+          slug: string
           status?: string
           stock_quantity?: number
           tags?: string[] | null
@@ -422,6 +517,7 @@ export type Database = {
           name?: string
           price?: number
           sku?: string | null
+          slug?: string
           status?: string
           stock_quantity?: number
           tags?: string[] | null
@@ -465,19 +561,81 @@ export type Database = {
         }
         Relationships: []
       }
+      egbg_appointments: {
+        Row: {
+          client_id: string
+          consultation_id: string | null
+          created_at: string
+          created_by_admin_id: string
+          date: string
+          id: string
+          notes: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          consultation_id?: string | null
+          created_at?: string
+          created_by_admin_id: string
+          date: string
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          consultation_id?: string | null
+          created_at?: string
+          created_by_admin_id?: string
+          date?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "egbg_appointments_admin_fk"
+            columns: ["created_by_admin_id"]
+            isOneToOne: false
+            referencedRelation: "egbg_admin_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "egbg_appointments_client_fk"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "egbg_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "egbg_appointments_consultation_fk"
+            columns: ["consultation_id"]
+            isOneToOne: false
+            referencedRelation: "egbg_consultations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       egbg_clients: {
         Row: {
           address: string | null
           allergies: string | null
+          client_id: string | null
           created_at: string
           created_by_admin_id: string | null
           current_medications: string | null
           date_of_birth: string
+          email: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
           full_name: string
-          gender: Database["public"]["Enums"]["egbg_gender"] | null
+          gender: Database["public"]["Enums"]["gender_type"] | null
           id: string
+          is_active: boolean | null
+          last_visit: string | null
           medical_history: string | null
           phone_number: string
           updated_at: string
@@ -485,15 +643,19 @@ export type Database = {
         Insert: {
           address?: string | null
           allergies?: string | null
+          client_id?: string | null
           created_at?: string
           created_by_admin_id?: string | null
           current_medications?: string | null
           date_of_birth: string
+          email?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           full_name: string
-          gender?: Database["public"]["Enums"]["egbg_gender"] | null
+          gender?: Database["public"]["Enums"]["gender_type"] | null
           id?: string
+          is_active?: boolean | null
+          last_visit?: string | null
           medical_history?: string | null
           phone_number: string
           updated_at?: string
@@ -501,15 +663,19 @@ export type Database = {
         Update: {
           address?: string | null
           allergies?: string | null
+          client_id?: string | null
           created_at?: string
           created_by_admin_id?: string | null
           current_medications?: string | null
           date_of_birth?: string
+          email?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           full_name?: string
-          gender?: Database["public"]["Enums"]["egbg_gender"] | null
+          gender?: Database["public"]["Enums"]["gender_type"] | null
           id?: string
+          is_active?: boolean | null
+          last_visit?: string | null
           medical_history?: string | null
           phone_number?: string
           updated_at?: string
@@ -588,32 +754,38 @@ export type Database = {
         Row: {
           consultation_id: string
           created_at: string
+          dispensed_at: string | null
           dosage: string
           duration: string
           frequency: string
           id: string
           instructions: string | null
           medicine_name: string
+          status: string | null
         }
         Insert: {
           consultation_id: string
           created_at?: string
+          dispensed_at?: string | null
           dosage: string
           duration: string
           frequency: string
           id?: string
           instructions?: string | null
           medicine_name: string
+          status?: string | null
         }
         Update: {
           consultation_id?: string
           created_at?: string
+          dispensed_at?: string | null
           dosage?: string
           duration?: string
           frequency?: string
           id?: string
           instructions?: string | null
           medicine_name?: string
+          status?: string | null
         }
         Relationships: [
           {
@@ -1508,12 +1680,12 @@ export type Database = {
     Functions: {
       consume_material_fifo: {
         Args: {
-          p_material_id: string
-          p_location: string
-          p_quantity: number
           p_consumption_type: string
-          p_reference_id?: string
+          p_location: string
+          p_material_id: string
           p_notes?: string
+          p_quantity: number
+          p_reference_id?: string
         }
         Returns: {
           batch_id: string
@@ -1529,24 +1701,28 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      generate_slug: {
+        Args: { input_text: string }
+        Returns: string
+      }
       get_user_role: {
         Args: { user_id?: string }
         Returns: Database["public"]["Enums"]["app_role"]
       }
       has_role: {
         Args: {
-          _user_id: string
           _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
         }
         Returns: boolean
       }
       log_activity: {
         Args: {
           p_action: string
-          p_table_name: string
-          p_record_id?: string
-          p_old_values?: Json
           p_new_values?: Json
+          p_old_values?: Json
+          p_record_id?: string
+          p_table_name: string
         }
         Returns: string
       }
@@ -1555,13 +1731,13 @@ export type Database = {
         Returns: undefined
       }
       validate_production_requirements: {
-        Args: { p_product_id: string; p_quantity: number; p_location: string }
+        Args: { p_location: string; p_product_id: string; p_quantity: number }
         Returns: {
+          available_quantity: number
+          is_sufficient: boolean
           material_id: string
           material_name: string
           required_quantity: number
-          available_quantity: number
-          is_sufficient: boolean
         }[]
       }
     }
@@ -1574,6 +1750,7 @@ export type Database = {
         | "completed"
         | "cancelled"
       egbg_gender: "male" | "female" | "other"
+      gender_type: "male" | "female" | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1710,6 +1887,7 @@ export const Constants = {
         "cancelled",
       ],
       egbg_gender: ["male", "female", "other"],
+      gender_type: ["male", "female", "other"],
     },
   },
 } as const
