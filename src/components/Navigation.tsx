@@ -25,9 +25,7 @@ const Navigation = () => {
         <div className="flex items-center space-x-4">
           <SidebarTrigger className="text-foreground hover:bg-accent hover:text-accent-foreground" />
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-primary-foreground" />
-            </div>
+            <img src="/logo.png" alt="Shift Manager" className="w-8 h-8 rounded-lg object-contain" />
             <h1 className="text-xl font-bold text-foreground">Shift Manager</h1>
           </div>
         </div>
