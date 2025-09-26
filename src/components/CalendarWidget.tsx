@@ -235,7 +235,7 @@ export default function CalendarWidget() {
 
       {/* Day Details Modal */}
       <Dialog open={!!selectedDate} onOpenChange={() => setSelectedDate(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0">
+        <DialogContent className="max-w-2xl h-[80vh] flex flex-col p-0">
           {/* Fixed Header */}
           <DialogHeader className="px-6 py-4 border-b bg-card shrink-0">
             <DialogTitle className="text-xl font-semibold">
@@ -244,9 +244,9 @@ export default function CalendarWidget() {
           </DialogHeader>
           
           {/* Scrollable Content */}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden min-h-0">
             {selectedShifts.length > 0 ? (
-              <div className="h-full flex flex-col">
+              <div className="h-full flex flex-col min-h-0">
                 {/* Summary Stats - Fixed */}
                 <div className="px-6 py-4 border-b bg-muted/30 shrink-0">
                   <div className="grid grid-cols-3 gap-4 text-center">
@@ -270,7 +270,7 @@ export default function CalendarWidget() {
                 </div>
 
                 {/* Scrollable Shifts List */}
-                <div className="flex-1 overflow-y-auto px-6 py-4">
+                <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-4">
                   <div className="space-y-3">
                     {selectedShifts.map((shift, index) => (
                       <Card key={index} className="border border-border/50 shadow-sm hover:shadow-md transition-shadow">
