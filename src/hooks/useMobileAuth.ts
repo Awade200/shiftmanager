@@ -20,9 +20,19 @@ export const useMobileAuth = () => {
       setUser(userData);
     }
     setLoading(false);
+  }, []);
 
+  useEffect(() => {
+    if (!user) return;
+
+    let lastActivityRef = Date.now();
+    
     // Activity tracking for auto-logout
-    const updateActivity = () => setLastActivity(Date.now());
+    const updateActivity = () => {
+      lastActivityRef = Date.now();
+      setLastActivity(Date.now());
+    };
+    
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
     
     events.forEach(event => {
@@ -31,7 +41,7 @@ export const useMobileAuth = () => {
 
     // Auto-logout timer (30 minutes = 1800000ms)
     const logoutTimer = setInterval(() => {
-      if (user && Date.now() - lastActivity > 1800000) {
+      if (Date.now() - lastActivityRef > 1800000) {
         signOut();
       }
     }, 60000); // Check every minute
@@ -42,7 +52,7 @@ export const useMobileAuth = () => {
       });
       clearInterval(logoutTimer);
     };
-  }, [user, lastActivity]);
+  }, [user]);
 
   const hashPin = async (pin: string): Promise<string> => {
     const encoder = new TextEncoder();
