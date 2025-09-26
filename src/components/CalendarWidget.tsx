@@ -235,68 +235,86 @@ export default function CalendarWidget() {
 
       {/* Day Details Modal */}
       <Dialog open={!!selectedDate} onOpenChange={() => setSelectedDate(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0">
+          {/* Fixed Header */}
+          <DialogHeader className="px-6 py-4 border-b bg-card shrink-0">
+            <DialogTitle className="text-xl font-semibold">
               Shifts for {selectedDate && format(selectedDate, 'EEEE, MMMM d, yyyy')}
             </DialogTitle>
           </DialogHeader>
           
-          {selectedShifts.length > 0 ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <div className="text-2xl font-bold">{selectedShifts.length}</div>
-                  <div className="text-sm text-muted-foreground">Shifts</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">
-                    {selectedShifts.reduce((sum, shift) => sum + shift.duration, 0).toFixed(1)}h
-                  </div>
-                  <div className="text-sm text-muted-foreground">Hours</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">
-                    £{selectedShifts.reduce((sum, shift) => sum + shift.earnings, 0).toFixed(2)}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Earnings</div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {selectedShifts.map((shift, index) => (
-                  <Card key={index}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium">{shift.clientName}</h4>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              {shift.startTime} - {shift.endTime} ({shift.duration}h)
-                            </div>
-                            {shift.location && (
-                              <div className="flex items-center gap-1">
-                                <MapPin className="w-4 h-4" />
-                                {shift.location}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-medium">£{shift.earnings.toFixed(2)}</div>
-                        </div>
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-hidden">
+            {selectedShifts.length > 0 ? (
+              <div className="h-full flex flex-col">
+                {/* Summary Stats - Fixed */}
+                <div className="px-6 py-4 border-b bg-muted/30 shrink-0">
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div className="space-y-1">
+                      <div className="text-2xl font-bold text-primary">{selectedShifts.length}</div>
+                      <div className="text-sm text-muted-foreground">Shifts</div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-2xl font-bold text-primary">
+                        {selectedShifts.reduce((sum, shift) => sum + shift.duration, 0).toFixed(1)}h
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      <div className="text-sm text-muted-foreground">Hours</div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-2xl font-bold text-primary">
+                        £{selectedShifts.reduce((sum, shift) => sum + shift.earnings, 0).toFixed(2)}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Earnings</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Scrollable Shifts List */}
+                <div className="flex-1 overflow-y-auto px-6 py-4">
+                  <div className="space-y-3">
+                    {selectedShifts.map((shift, index) => (
+                      <Card key={index} className="border border-border/50 shadow-sm hover:shadow-md transition-shadow">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-foreground mb-2">{shift.clientName}</h4>
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <Clock className="w-4 h-4 shrink-0" />
+                                  <span>{shift.startTime} - {shift.endTime}</span>
+                                  <Badge variant="secondary" className="ml-2">
+                                    {shift.duration}h
+                                  </Badge>
+                                </div>
+                                {shift.location && (
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <MapPin className="w-4 h-4 shrink-0" />
+                                    <span className="truncate">{shift.location}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="text-lg font-semibold text-primary">
+                                £{shift.earnings.toFixed(2)}
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="text-center text-muted-foreground py-8">
-              No shifts scheduled for this day
-            </div>
-          )}
+            ) : (
+              <div className="flex items-center justify-center h-full px-6 py-8">
+                <div className="text-center">
+                  <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No shifts scheduled for this day</p>
+                </div>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
