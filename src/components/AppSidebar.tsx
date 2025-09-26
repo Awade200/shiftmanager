@@ -162,9 +162,7 @@ export function AppSidebar() {
           "flex items-center space-x-2 p-4 border-b border-border mb-2",
           collapsed && "justify-center px-2"
         )}>
-          <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center flex-shrink-0">
-            <Calendar className="w-5 h-5 text-primary-foreground" />
-          </div>
+          <img src="/logo.png" alt="Shift Manager" className="w-8 h-8 rounded-lg flex-shrink-0" />
           {!collapsed && (
             <h1 className="text-lg font-bold text-foreground">Shift Manager</h1>
           )}
