@@ -43,9 +43,7 @@ export const MarketingNav = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
-              <Clock className="w-4 h-4 text-white" />
-            </div>
+            <img src="/logo.png" alt="Shift Manager" className="w-8 h-8" />
             <span className="text-xl font-bold text-foreground">
               Shift Manager
             </span>
