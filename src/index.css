@@ -2,55 +2,66 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Shift Manager Design System - Professional work app theme */
+/* Shift Manager Design System - Midnight Indigo Premium Theme */
 
 @layer base {
   :root {
-    --background: 250 50% 98%;
-    --foreground: 215 25% 15%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 215 25% 15%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 15%;
-
-    --primary: 217 91% 60%;
+    /* Core Midnight Indigo Palette */
+    --primary: 233 100% 68%;           /* #5B6CFF */
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 217 91% 70%;
+    --primary-glow: 252 100% 79%;      /* #9B8CFF */
 
-    --secondary: 215 20% 95%;
-    --secondary-foreground: 215 25% 25%;
-
-    --muted: 215 20% 96%;
-    --muted-foreground: 215 15% 50%;
-
-    --accent: 142 76% 36%;
+    --accent: 160 74% 49%;             /* #16DB93 - Mint */
     --accent-foreground: 0 0% 100%;
 
-    --success: 142 76% 36%;
-    --success-foreground: 0 0% 100%;
-
-    --warning: 38 92% 50%;
+    --warning: 41 100% 63%;            /* #FFC145 - Amber */
     --warning-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 100% 68%;         /* #FF5D5D - Coral */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 215 20% 88%;
-    --input: 215 20% 88%;
-    --ring: 217 91% 60%;
+    --info: 252 100% 79%;              /* #9B8CFF - Iris */
+    --info-foreground: 0 0% 100%;
 
-    /* Professional gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
-    --gradient-success: linear-gradient(135deg, hsl(var(--success)), hsl(142 76% 45%));
-    --gradient-card: linear-gradient(145deg, hsl(var(--card)), hsl(215 30% 99%));
+    /* Neutrals - Premium Scale */
+    --background: 210 40% 98%;         /* F8FAFC - Slate 50 */
+    --foreground: 222 47% 11%;         /* 0F172A - Slate 900 */
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --secondary: 215 16% 92%;          /* E2E8F0 - Slate 200 */
+    --secondary-foreground: 215 25% 25%;
+
+    --muted: 215 16% 92%;
+    --muted-foreground: 215 15% 50%;
+
+    --success: 160 74% 49%;            /* Mint for success states */
+    --success-foreground: 0 0% 100%;
+
+    --border: 215 16% 84%;
+    --input: 215 16% 84%;
+    --ring: 233 100% 68%;
+
+    /* Premium Gradients */
+    --gradient-primary: linear-gradient(135deg, #5B6CFF 0%, #9B8CFF 100%);
+    --gradient-success: linear-gradient(135deg, #10B981 0%, #16DB93 100%);
+    --gradient-card: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.6));
     
-    /* Shadows */
-    --shadow-card: 0 4px 6px -1px hsl(215 25% 15% / 0.1), 0 2px 4px -1px hsl(215 25% 15% / 0.06);
-    --shadow-lg: 0 10px 15px -3px hsl(215 25% 15% / 0.1), 0 4px 6px -2px hsl(215 25% 15% / 0.05);
+    /* Elevation System */
+    --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.08);
+    --shadow-2: 0 6px 16px rgba(15, 23, 42, 0.10);
+    --shadow-modal: 0 24px 64px rgba(2, 6, 23, 0.25);
+    --shadow-card: var(--shadow-1);
+    --shadow-lg: var(--shadow-2);
 
-    --radius: 0.5rem;
+    /* Premium Radius System */
+    --radius-xs: 8px;
+    --radius: 14px;
+    --radius-lg: 22px;
 
     --sidebar-background: 0 0% 98%;
 
@@ -70,49 +81,56 @@
   }
 
   .dark {
-    --background: 215 30% 8%;
-    --foreground: 215 20% 95%;
+    /* Dark Mode - Midnight Indigo */
+    --background: 222 47% 6%;          /* Deep slate */
+    --foreground: 210 40% 98%;
 
-    --card: 215 25% 12%;
-    --card-foreground: 215 20% 95%;
+    --card: 222 47% 8%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: 215 25% 12%;
-    --popover-foreground: 215 20% 95%;
+    --popover: 222 47% 8%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 217 91% 65%;
-    --primary-foreground: 215 30% 8%;
-    --primary-glow: 217 91% 75%;
+    --primary: 233 100% 68%;           /* Same vibrant indigo */
+    --primary-foreground: 222 47% 6%;
+    --primary-glow: 252 100% 79%;
 
-    --secondary: 215 25% 18%;
+    --secondary: 222 17% 15%;
     --secondary-foreground: 215 20% 85%;
 
-    --muted: 215 25% 15%;
+    --muted: 222 17% 15%;
     --muted-foreground: 215 15% 60%;
 
-    --accent: 142 76% 45%;
+    --accent: 160 74% 49%;             /* Mint accent */
     --accent-foreground: 0 0% 100%;
 
-    --success: 142 76% 45%;
+    --success: 160 74% 49%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 55%;
+    --warning: 41 100% 63%;
     --warning-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 65%;
+    --destructive: 0 100% 68%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 215 25% 20%;
-    --input: 215 25% 18%;
-    --ring: 217 91% 65%;
+    --info: 252 100% 79%;
+    --info-foreground: 0 0% 100%;
 
-    /* Dark mode gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
-    --gradient-success: linear-gradient(135deg, hsl(var(--success)), hsl(142 76% 55%));
-    --gradient-card: linear-gradient(145deg, hsl(var(--card)), hsl(215 25% 15%));
+    --border: 222 17% 20%;
+    --input: 222 17% 15%;
+    --ring: 233 100% 68%;
+
+    /* Dark Mode Gradients */
+    --gradient-primary: linear-gradient(135deg, #5B6CFF 0%, #9B8CFF 100%);
+    --gradient-success: linear-gradient(135deg, #10B981 0%, #16DB93 100%);
+    --gradient-card: linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
     
-    /* Dark shadows */
-    --shadow-card: 0 4px 6px -1px hsl(215 30% 5% / 0.3), 0 2px 4px -1px hsl(215 30% 5% / 0.2);
-    --shadow-lg: 0 10px 15px -3px hsl(215 30% 5% / 0.4), 0 4px 6px -2px hsl(215 30% 5% / 0.3);
+    /* Dark Mode Shadows */
+    --shadow-1: 0 1px 2px rgba(2, 6, 23, 0.3);
+    --shadow-2: 0 6px 16px rgba(2, 6, 23, 0.4);
+    --shadow-modal: 0 24px 64px rgba(2, 6, 23, 0.6);
+    --shadow-card: var(--shadow-1);
+    --shadow-lg: var(--shadow-2);
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
