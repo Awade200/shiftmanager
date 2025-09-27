@@ -251,7 +251,7 @@ function ContactSection() {
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button variant="outline" asChild>
-                <a href="mailto:lawalsulaiman247@gmail.com?subject=Support%20Request%20from%20Shift%20Manager&body=Hello%2C%0A%0AI%20need%20help%20with%20Shift%20Manager%3A%0A%0A-%20Issue%3A%20%5BDescribe%20your%20problem%5D%0A-%20Account%3A%20%5BYour%20account%20details%20if%20relevant%5D%0A%0AThank%20you%21">Email Support</a>
+                <a href="mailto:lawalsulaiman247@gmail.com?subject=Contacting you from Shift Manager&body=Hello,%0A%0AI am contacting you from Shift Manager and would like to:%0A%0A- Get support with: [Please describe your issue here]%0A- Ask about: [Your question here]%0A%0AThank you for your time!%0A%0ABest regards">Email Support</a>
               </Button>
               <Button variant="outline" asChild>
                 <a href="tel:+447778561600">Call: +44 777 856 1600</a>
