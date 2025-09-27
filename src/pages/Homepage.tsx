@@ -240,7 +240,7 @@ function ContactSection() {
             <a href="/auth">Create Free Account</a>
           </Button>
           <Button asChild variant="outline" size="lg" className="text-lg px-8">
-            <a href="mailto:support@shiftmanager.com">Contact Support</a>
+            <a href="mailto:lawalsulaiman247@gmail.com?subject=Contact%20from%20Shift%20Manager%20User&body=Hello%2C%0A%0AI%20am%20reaching%20out%20from%20Shift%20Manager%20and%20would%20like%20to%3A%0A%0A-%20Get%20support%20with%3A%20%5BDescribe%20your%20issue%5D%0A-%20Ask%20about%3A%20%5BYour%20question%5D%0A%0AThank%20you%20for%20your%20time%21%0A%0ABest%20regards">Contact Support</a>
           </Button>
         </div>
         <Card className="max-w-2xl mx-auto">
@@ -251,10 +251,10 @@ function ContactSection() {
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button variant="outline" asChild>
-                <a href="mailto:support@shiftmanager.com">Email Support</a>
+                <a href="mailto:lawalsulaiman247@gmail.com?subject=Support%20Request%20from%20Shift%20Manager&body=Hello%2C%0A%0AI%20need%20help%20with%20Shift%20Manager%3A%0A%0A-%20Issue%3A%20%5BDescribe%20your%20problem%5D%0A-%20Account%3A%20%5BYour%20account%20details%20if%20relevant%5D%0A%0AThank%20you%21">Email Support</a>
               </Button>
               <Button variant="outline" asChild>
-                <a href="tel:+44-800-123-4567">Call: +44 800 123 4567</a>
+                <a href="tel:+447778561600">Call: +44 777 856 1600</a>
               </Button>
             </div>
           </CardContent>
@@ -292,10 +292,10 @@ function SimpleFooter() {
           <div className="space-y-4">
             <h4 className="font-semibold">Support</h4>
             <div className="space-y-2 text-sm">
-              <a href="mailto:support@shiftmanager.com" className="block text-muted-foreground hover:text-foreground transition-colors">
+              <a href="mailto:lawalsulaiman247@gmail.com?subject=Support%20Request%20from%20Shift%20Manager&body=Hello%2C%0A%0AI%20need%20assistance%20with%20Shift%20Manager%3A%0A%0A%5BDescribe%20your%20issue%20here%5D%0A%0AThank%20you%21" className="block text-muted-foreground hover:text-foreground transition-colors">
                 Email Support
               </a>
-              <a href="tel:+44-800-123-4567" className="block text-muted-foreground hover:text-foreground transition-colors">
+              <a href="tel:+447778561600" className="block text-muted-foreground hover:text-foreground transition-colors">
                 Phone Support
               </a>
             </div>
