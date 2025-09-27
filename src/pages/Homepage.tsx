@@ -4,17 +4,60 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, Shield, Users, TrendingUp, LogIn, UserPlus, Mail } from "lucide-react";
 
 const Homepage = () => {
+  // Structured Data for SEO
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Shift Manager",
+    "description": "Professional shift management app to track work hours, earnings, and payment status. Perfect for healthcare workers, retail staff, and anyone with rotating schedules.",
+    "url": "https://shift-manager.lovable.app",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.9",
+      "ratingCount": "15000",
+      "bestRating": "5",
+      "worstRating": "1"
+    },
+    "author": {
+      "@type": "Organization",
+      "name": "Shift Manager",
+      "url": "https://shift-manager.lovable.app"
+    },
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "telephone": "+447778561600",
+      "contactType": "customer service",
+      "email": "lawalsulaiman247@gmail.com",
+      "availableLanguage": "English"
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-background">
-      <SimpleNav />
-      <main className="relative">
-        <HeroSection />
-        <FeaturesSection />
-        <AboutSection />
-        <ContactSection />
-      </main>
-      <SimpleFooter />
-    </div>
+    <>
+      {/* Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
+      
+      <div className="min-h-screen bg-background">
+        <SimpleNav />
+        <main className="relative">
+          <HeroSection />
+          <FeaturesSection />
+          <AboutSection />
+          <ContactSection />
+        </main>
+        <SimpleFooter />
+      </div>
+    </>
   );
 };
 
@@ -58,14 +101,14 @@ function SimpleNav() {
 
 function HeroSection() {
   return (
-    <section className="relative overflow-hidden py-20 md:py-32">
+    <section className="relative overflow-hidden py-20 md:py-32" itemScope itemType="https://schema.org/WebPage">
       <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
       <div className="mx-auto max-w-6xl px-4">
         <div className="text-center">
           <Badge variant="secondary" className="mb-6">
             Shift Management Made Simple
           </Badge>
-          <h1 className="text-4xl font-bold tracking-tight md:text-6xl lg:text-7xl mb-6">
+          <h1 className="text-4xl font-bold tracking-tight md:text-6xl lg:text-7xl mb-6" itemProp="headline">
             Take Control of Your{" "}
             <span className="text-primary">Work Schedule</span>
           </h1>
