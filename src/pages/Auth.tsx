@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { useMobileAuth } from '@/hooks/useMobileAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Phone, User, Lock } from 'lucide-react';
+import { Phone, User, Lock, ArrowLeft } from 'lucide-react';
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
@@ -118,9 +118,20 @@ export default function Auth() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-accent/5 p-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Shift Manager</h1>
-          <p className="text-muted-foreground">Track your shifts, calculate pay & taxes</p>
+        <div className="mb-6">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate('/')}
+            className="mb-4 gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Homepage
+          </Button>
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-foreground mb-2">Shift Manager</h1>
+            <p className="text-muted-foreground">Track your shifts, calculate pay & taxes</p>
+          </div>
         </div>
 
         <Card className="shadow-elegant">
