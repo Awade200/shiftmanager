@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, Camera, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Upload, FileText, Camera, AlertTriangle, CheckCircle, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { useUploadSession } from '@/hooks/useUploadSession';
 import { useMobileAuth } from '@/hooks/useMobileAuth';
+import { useDayManagement } from '@/hooks/useDayManagement';
 import { useToast } from '@/hooks/use-toast';
 import { DayCard } from '@/components/DayCard';
 import { UnresolvedShifts } from '@/components/UnresolvedShifts';
@@ -20,6 +21,7 @@ export default function UploadSession() {
   const [selectedActions, setSelectedActions] = useState<Record<string, DayAction['type']>>({});
   const [isUploading, setIsUploading] = useState(false);
   const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null);
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
   
   const {
     currentSession,
@@ -32,7 +34,28 @@ export default function UploadSession() {
     clearSession
   } = useUploadSession();
   
+  const { cleanupEmptyDays } = useDayManagement(mobileNumber);
   const { toast } = useToast();
+
+  const handleCleanup = async () => {
+    try {
+      setIsCleaningUp(true);
+      const deletedCount = await cleanupEmptyDays();
+      
+      toast({
+        title: "Cleanup Complete",
+        description: `Removed ${deletedCount} empty day record${deletedCount !== 1 ? 's' : ''}`,
+      });
+    } catch (err) {
+      toast({
+        title: "Cleanup Failed",
+        description: err instanceof Error ? err.message : "Failed to cleanup data",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCleaningUp(false);
+    }
+  };
 
   // Initialize upload session
   useEffect(() => {
@@ -181,6 +204,23 @@ export default function UploadSession() {
           Upload your rota data and organize by days automatically
         </p>
       </div>
+
+      {/* Cleanup Alert */}
+      <Alert>
+        <AlertTriangle className="h-4 w-4" />
+        <AlertDescription className="flex items-center justify-between">
+          <span>Have incomplete data? Clean up empty day records before uploading.</span>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleCleanup}
+            disabled={isCleaningUp}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            {isCleaningUp ? 'Cleaning...' : 'Cleanup'}
+          </Button>
+        </AlertDescription>
+      </Alert>
 
       {/* Upload Section */}
       {parsedDays.length === 0 && (

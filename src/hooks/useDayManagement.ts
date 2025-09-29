@@ -260,6 +260,55 @@ export function useDayManagement(mobileNumber?: string) {
     }
   };
 
+  // Clean up days that have no shifts (data integrity fix)
+  const cleanupEmptyDays = async (): Promise<number> => {
+    try {
+      if (!mobileNumber) {
+        throw new Error('Mobile number not set');
+      }
+
+      // Get all days for this user
+      const { data: allDays, error: daysError } = await supabase
+        .from('days')
+        .select('id, day_date')
+        .eq('mobile_number', mobileNumber);
+
+      if (daysError) throw daysError;
+
+      let deletedCount = 0;
+      
+      // Check each day for shifts
+      for (const day of allDays || []) {
+        const { data: shifts, error: shiftsError } = await supabase
+          .from('shifts')
+          .select('id')
+          .eq('day_id', day.id)
+          .limit(1);
+
+        if (shiftsError) throw shiftsError;
+
+        // If no shifts exist for this day, delete it
+        if (!shifts || shifts.length === 0) {
+          const { error: deleteError } = await supabase
+            .from('days')
+            .delete()
+            .eq('id', day.id);
+
+          if (deleteError) throw deleteError;
+          deletedCount++;
+          console.log(`Cleaned up empty day: ${day.day_date}`);
+        }
+      }
+
+      // Reload days after cleanup
+      await loadDays();
+      return deletedCount;
+    } catch (err) {
+      console.error('Error cleaning up empty days:', err);
+      throw err;
+    }
+  };
+
   // Calculate day statistics
   const calculateDayStats = (daysData: Day[]): DayStats => {
     const stats: DayStats = {
@@ -344,6 +393,8 @@ export function useDayManagement(mobileNumber?: string) {
     replaceDayShifts,
     deleteDay,
     deleteAllDays,
+    cleanupEmptyDays,
+    calculateDayStats,
     getDaysInRange,
     getDay,
     calculateDuration
