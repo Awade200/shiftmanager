@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { DuplicateCheckResult, UpdateChoice, SaveSummary } from '@/types/duplicateHandling';
 import { ShiftFormData } from '@/types/shift';
+import { DayShift } from '@/types/day';
 import { toZonedTime, formatInTimeZone } from 'date-fns-tz';
 import { parse, isAfter, isBefore, isEqual } from 'date-fns';
 
@@ -293,9 +294,98 @@ export const useConflictDetection = () => {
     };
   };
 
+  // Check for conflicts with existing shifts for a specific day
+  const checkDayConflicts = async (
+    dayDate: string,
+    dayShifts: DayShift[],
+    mobileNumber: string
+  ): Promise<DuplicateCheckResult[]> => {
+    try {
+      // Get existing shifts for this day
+      const { data: existingShifts, error } = await supabase
+        .from('shifts')
+        .select(`
+          id,
+          start_time,
+          end_time,
+          client_name,
+          location,
+          day_id,
+          days!inner(day_date, mobile_number)
+        `)
+        .eq('days.day_date', dayDate)
+        .eq('days.mobile_number', mobileNumber);
+
+      if (error) {
+        throw error;
+      }
+
+      const conflicts: DuplicateCheckResult[] = [];
+
+      dayShifts.forEach(newShift => {
+        const conflictingShifts = existingShifts?.filter(existing => 
+          checkTimeOverlap(
+            newShift.start_time,
+            newShift.end_time,
+            existing.start_time,
+            existing.end_time
+          )
+        ) || [];
+
+        if (conflictingShifts.length > 0) {
+          const conflict: DuplicateCheckResult = {
+            id: newShift.id,
+            status: 'partial',
+            overlapType: 'partial',
+            newShift: {
+              date: dayDate,
+              clientName: newShift.client_name,
+              startTime: newShift.start_time,
+              endTime: newShift.end_time,
+              location: newShift.location,
+              hourlyRate: newShift.hourly_rate || 25
+            },
+            conflictingShifts: conflictingShifts.map(shift => ({
+              id: shift.id,
+              startTime: shift.start_time,
+              endTime: shift.end_time,
+              clientName: shift.client_name
+            }))
+          };
+          conflicts.push(conflict);
+        }
+      });
+
+      return conflicts;
+    } catch (err) {
+      console.error('Error checking day conflicts:', err);
+      throw err;
+    }
+  };
+
+  // Helper function to check time overlap
+  const checkTimeOverlap = (
+    start1: string,
+    end1: string,
+    start2: string,
+    end2: string
+  ): boolean => {
+    const s1 = new Date(`1970-01-01T${start1}`);
+    const e1 = new Date(`1970-01-01T${end1}`);
+    const s2 = new Date(`1970-01-01T${start2}`);
+    const e2 = new Date(`1970-01-01T${end2}`);
+
+    // Handle overnight shifts
+    if (e1 <= s1) e1.setDate(e1.getDate() + 1);
+    if (e2 <= s2) e2.setDate(e2.getDate() + 1);
+
+    return s1 < e2 && s2 < e1;
+  };
+
   return {
     checkForConflicts,
     processShiftsWithChoices,
+    checkDayConflicts,
     isProcessing,
   };
 };
