@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
-  const { dayStats, days } = useDayManagement();
+  const { dayStats, days, deleteAllDays } = useDayManagement();
   const [newHourlyRate, setNewHourlyRate] = useState('15.00');
   const { toast } = useToast();
   
@@ -86,6 +86,32 @@ const Dashboard = () => {
     }
   };
 
+  const handleDeleteAllData = async () => {
+    if (window.confirm('Are you sure you want to delete ALL shifts and days? This action cannot be undone.')) {
+      try {
+        const success = await deleteAllDays();
+        if (success) {
+          toast({
+            title: "All data deleted",
+            description: "All shifts and days have been permanently deleted",
+          });
+        } else {
+          toast({
+            title: "Delete failed",
+            description: "Could not delete all data. Please try again.",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        toast({
+          title: "Delete failed",
+          description: "Could not delete all data. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto p-4 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -97,6 +123,9 @@ const Dashboard = () => {
           <Button onClick={handleExportCSV} variant="outline" size="sm">
             <Download className="w-4 h-4 mr-2" />
             Export CSV
+          </Button>
+          <Button onClick={handleDeleteAllData} variant="destructive" size="sm">
+            Delete All Data
           </Button>
           <Button asChild variant="default">
             <Link to="/upload">

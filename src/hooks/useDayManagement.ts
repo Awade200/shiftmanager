@@ -181,6 +181,40 @@ export function useDayManagement() {
     }
   };
 
+  // Delete all days for current account
+  const deleteAllDays = async (): Promise<boolean> => {
+    try {
+      // First delete all shifts to avoid foreign key issues
+      const { error: shiftsError } = await supabase
+        .from('shifts')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all shifts
+
+      if (shiftsError) {
+        console.error('Error deleting shifts:', shiftsError);
+        return false;
+      }
+
+      // Then delete all days
+      const { error: daysError } = await supabase
+        .from('days')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all days
+
+      if (daysError) {
+        console.error('Error deleting days:', daysError);
+        return false;
+      }
+
+      // Clear local state
+      setDays([]);
+      return true;
+    } catch (error) {
+      console.error('Error deleting all data:', error);
+      return false;
+    }
+  };
+
   // Calculate day statistics
   const calculateDayStats = (daysData: Day[]): DayStats => {
     const stats: DayStats = {
@@ -262,6 +296,7 @@ export function useDayManagement() {
     addShiftsToDay,
     replaceDayShifts,
     deleteDay,
+    deleteAllDays,
     getDaysInRange,
     getDay,
     calculateDuration
