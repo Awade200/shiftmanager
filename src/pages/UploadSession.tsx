@@ -32,7 +32,7 @@ export default function UploadSession() {
     parseUploadedData,
     processDayActions,
     clearSession
-  } = useUploadSession();
+  } = useUploadSession(mobileNumber);
   
   const { cleanupEmptyDays } = useDayManagement(mobileNumber);
   const { toast } = useToast();

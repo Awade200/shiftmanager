@@ -8,13 +8,13 @@ import { useDayManagement } from './useDayManagement';
 
 const TIMEZONE = 'Europe/London';
 
-export function useUploadSession() {
+export function useUploadSession(mobileNumber?: string) {
   const [currentSession, setCurrentSession] = useState<ImportSession | null>(null);
   const [parsedDays, setParsedDays] = useState<ParsedDay[]>([]);
   const [unresolvedShifts, setUnresolvedShifts] = useState<ShiftRow[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   
-  const { getOrCreateDay, addShiftsToDay, replaceDayShifts, calculateDuration } = useDayManagement();
+  const { getOrCreateDay, addShiftsToDay, replaceDayShifts, calculateDuration } = useDayManagement(mobileNumber);
 
   // Start new upload session
   const startUploadSession = async (mobileNumber: string): Promise<string> => {
