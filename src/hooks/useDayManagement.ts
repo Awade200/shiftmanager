@@ -65,10 +65,14 @@ export function useDayManagement(mobileNumber?: string) {
         .eq('day_date', dayDate)
         .eq('mobile_number', mobileNumber);
 
-      const { data: dayData, error: dayError } = await query.single();
+      const { data: dayData, error: dayError } = await query.maybeSingle();
 
       if (dayError) {
         throw dayError;
+      }
+
+      if (!dayData) {
+        return null;
       }
 
       let shiftsQuery = supabase
