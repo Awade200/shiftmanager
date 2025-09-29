@@ -50,13 +50,35 @@ export function DayDetailView({ dayDate, onClose, className }: DayDetailViewProp
   const loadDayData = async () => {
     try {
       setLoading(true);
+      console.log('Loading day data for:', dayDate, 'mobile:', user?.mobile_number);
+      
+      if (!user?.mobile_number) {
+        toast({
+          title: "Error",
+          description: "User not authenticated",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       const data = await getDayWithShifts(dayDate);
+      console.log('Day data loaded:', data);
+      
+      if (!data) {
+        // Day doesn't exist yet - show empty state
+        toast({
+          title: "No Data",
+          description: "No shifts found for this day",
+          variant: "default"
+        });
+      }
+      
       setDayData(data);
     } catch (err) {
       console.error('Error loading day data:', err);
       toast({
         title: "Error",
-        description: "Failed to load day data",
+        description: "Failed to load day data. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -224,13 +246,35 @@ export function DayDetailView({ dayDate, onClose, className }: DayDetailViewProp
   }
 
   if (!dayData) {
+    const emptyDate = parseISO(dayDate);
+    const emptyFormattedDate = format(emptyDate, 'EEEE, MMMM do, yyyy');
+    
     return (
-      <Alert>
-        <AlertTriangle className="h-4 w-4" />
-        <AlertDescription>
-          Failed to load day data. Please try again.
-        </AlertDescription>
-      </Alert>
+      <div className={cn("space-y-6", className)}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Calendar className="h-6 w-6 text-primary" />
+            <div>
+              <h1 className="text-2xl font-bold">{emptyFormattedDate}</h1>
+              <p className="text-muted-foreground">No shifts for this day</p>
+            </div>
+          </div>
+          <Button onClick={onClose} variant="outline">
+            <X className="h-4 w-4 mr-2" />
+            Close
+          </Button>
+        </div>
+
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Calendar className="h-16 w-16 text-muted-foreground/30 mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No Shifts Yet</h3>
+            <p className="text-muted-foreground text-center max-w-sm">
+              There are no shifts scheduled for this day. Upload or add shifts to get started.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
