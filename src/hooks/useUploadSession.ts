@@ -127,15 +127,28 @@ export function useUploadSession() {
         // Sort shifts by start time before creating ParsedDay
         const sortedShifts = shifts.sort((a, b) => a.startTime.localeCompare(b.startTime));
         
-        const dayShifts = sortedShifts.map(shift => ({
-          id: crypto.randomUUID(),
-          start_time: shift.startTime,
-          end_time: shift.endTime,
-          client_name: shift.clientName,
-          location: '',
-          status: validateShift(shift) ? 'ready' as const : 'error' as const,
-          errors: getShiftErrors(shift)
-        }));
+        console.log(`📅 Processing day ${date} with ${shifts.length} shifts:`, shifts);
+        
+        const dayShifts = sortedShifts.map(shift => {
+          const isValid = validateShift(shift);
+          console.log(`  ✓ Shift validation:`, {
+            client: shift.clientName,
+            start: shift.startTime,
+            end: shift.endTime,
+            valid: isValid,
+            errors: isValid ? [] : getShiftErrors(shift)
+          });
+          
+          return {
+            id: crypto.randomUUID(),
+            start_time: shift.startTime,
+            end_time: shift.endTime,
+            client_name: shift.clientName,
+            location: '',
+            status: isValid ? 'ready' as const : 'error' as const,
+            errors: getShiftErrors(shift)
+          };
+        });
 
         const totalHours = dayShifts
           .filter(s => s.status === 'ready')
@@ -218,12 +231,18 @@ export function useUploadSession() {
               savedCount++;
             }
           } else if (action.type === 'merge') {
+            console.log(`💾 Merging shifts for day ${action.day_date}:`, {
+              shiftsCount: action.shifts?.length || 0,
+              shifts: action.shifts
+            });
+            
             if (action.shifts && action.shifts.length > 0) {
               // Sort shifts by start time before saving
               const sortedShifts = [...action.shifts].sort((a, b) => 
                 a.start_time.localeCompare(b.start_time)
               );
-              await addShiftsToDay(dayId, sortedShifts.map(shift => ({
+              
+              const shiftsToSave = sortedShifts.map(shift => ({
                 date: action.day_date,
                 startTime: shift.start_time,
                 endTime: shift.end_time,
@@ -231,8 +250,14 @@ export function useUploadSession() {
                 location: shift.location,
                 hourlyRate: shift.hourly_rate || 25, // Default rate
                 isPaid: shift.is_paid || false
-              })));
+              }));
+              
+              console.log(`  → Saving ${shiftsToSave.length} shifts to day ${dayId}`);
+              await addShiftsToDay(dayId, shiftsToSave);
+              console.log(`  ✅ Saved successfully`);
               savedCount++;
+            } else {
+              console.log(`  ⚠️ No shifts to merge for ${action.day_date}`);
             }
           }
         } catch (err) {

@@ -103,6 +103,12 @@ export function useDayManagement() {
   // Add shifts to a day
   const addShiftsToDay = async (dayId: string, shifts: ShiftFormData[]): Promise<DayShift[]> => {
     try {
+      console.log(`🔄 addShiftsToDay called:`, {
+        dayId,
+        shiftsCount: shifts.length,
+        shifts
+      });
+      
       const shiftsToInsert = shifts.map(shift => ({
         day_id: dayId,
         user_id: crypto.randomUUID(), // Temporary user_id
@@ -120,14 +126,19 @@ export function useDayManagement() {
         mobile_number: 'default-mobile' // Fixed to match mobile_auth table
       }));
 
+      console.log(`📤 Inserting ${shiftsToInsert.length} shifts:`, shiftsToInsert);
+      
       const { data, error } = await supabase
         .from('shifts')
         .insert(shiftsToInsert)
         .select();
 
       if (error) {
+        console.error('❌ Insert error:', error);
         throw error;
       }
+      
+      console.log(`✅ Insert successful, received ${data?.length || 0} shifts back:`, data);
 
       return (data || []).map(shift => ({
         ...shift,
