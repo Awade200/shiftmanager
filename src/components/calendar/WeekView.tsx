@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Day } from '@/types/day';
 import { useDayManagement } from '@/hooks/useDayManagement';
+import { useMobileAuth } from '@/hooks/useMobileAuth';
 import { cn } from '@/lib/utils';
 
 interface WeekViewProps {
@@ -29,7 +30,8 @@ export function WeekView({
   onDayClick,
   className 
 }: WeekViewProps) {
-  const { days, loading } = useDayManagement();
+  const { user } = useMobileAuth();
+  const { days, loading } = useDayManagement(user?.mobile_number);
 
   const weekDays = useMemo(() => {
     const start = startOfWeek(selectedDate, { weekStartsOn: 1 }); // Monday start

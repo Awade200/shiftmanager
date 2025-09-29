@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Day } from '@/types/day';
 import { useDayManagement } from '@/hooks/useDayManagement';
+import { useMobileAuth } from '@/hooks/useMobileAuth';
 import { cn } from '@/lib/utils';
 
 interface DayCalendarViewProps {
@@ -22,7 +23,8 @@ export function DayCalendarView({
   className 
 }: DayCalendarViewProps) {
   const [currentMonth, setCurrentMonth] = useState(selectedDate);
-  const { days, loading } = useDayManagement();
+  const { user } = useMobileAuth();
+  const { days, loading } = useDayManagement(user?.mobile_number);
 
   const monthDays = useMemo(() => {
     const start = startOfMonth(currentMonth);

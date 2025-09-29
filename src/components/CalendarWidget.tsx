@@ -6,11 +6,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ChevronLeft, ChevronRight, Clock, MapPin, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDayManagement } from '@/hooks/useDayManagement';
+import { useMobileAuth } from '@/hooks/useMobileAuth';
 import { DayShift } from '@/types/day';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, getDay } from 'date-fns';
 
 export default function CalendarWidget() {
-  const { days, getDayWithShifts } = useDayManagement();
+  const { user } = useMobileAuth();
+  const { days, getDayWithShifts } = useDayManagement(user?.mobile_number);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedShifts, setSelectedShifts] = useState<DayShift[]>([]);
