@@ -45,17 +45,14 @@ interface NavItem {
 const navItems: NavItem[] = [
   { path: '/dashboard', label: 'Dashboard', icon: Home },
   {
-    label: 'Shifts',
-    icon: Users,
+    label: 'Daily Management',
+    icon: CalendarDays,
     items: [
+      { path: '/calendar', label: 'Calendar View', icon: Calendar },
+      { path: '/upload', label: 'Upload Shifts', icon: Plus },
       { path: '/todays-shifts', label: "Today's Shifts", icon: Clock },
-      { path: '/add-shift', label: 'Add Shift', icon: Plus },
-      { path: '/paste-shifts', label: 'Paste Shifts', icon: Clipboard },
-      { path: '/all-shifts', label: 'All Shifts', icon: Calendar },
-      { path: '/grouped-shifts', label: 'Grouped Shifts', icon: Users },
     ]
   },
-  
   { path: '/analytics', label: 'Analytics', icon: BarChart3 },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
