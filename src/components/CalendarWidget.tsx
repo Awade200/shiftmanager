@@ -5,29 +5,20 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ChevronLeft, ChevronRight, Clock, MapPin, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useShifts } from '@/hooks/useShifts';
+import { useDayManagement } from '@/hooks/useDayManagement';
+import { DayShift } from '@/types/day';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, getDay } from 'date-fns';
 
-interface DayShift {
-  id: string;
-  clientName: string;
-  startTime: string;
-  endTime: string;
-  duration: number;
-  earnings: number;
-  location?: string;
-}
-
 export default function CalendarWidget() {
-  const { shifts } = useShifts();
+  const { days, getDayWithShifts } = useDayManagement();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedShifts, setSelectedShifts] = useState<DayShift[]>([]);
 
   // Move useMemo BEFORE any conditional returns to follow Rules of Hooks
   const { calendarDays, monthStats } = useMemo(() => {
-    // Add safety check for shifts
-    if (!shifts || !Array.isArray(shifts)) {
+    // Add safety check for days
+    if (!days || !Array.isArray(days)) {
       return {
         calendarDays: [],
         monthStats: { totalHours: 0, totalEarnings: 0, totalShifts: 0, activeDays: 0 }
@@ -36,57 +27,56 @@ export default function CalendarWidget() {
 
     const start = startOfMonth(currentDate);
     const end = endOfMonth(currentDate);
-    const days = eachDayOfInterval({ start, end });
+    const calendarDays = eachDayOfInterval({ start, end });
     
-    // Get shifts for current month
-    const monthShifts = shifts.filter(shift => {
-      const shiftDate = new Date(shift.date);
-      return shiftDate >= start && shiftDate <= end;
+    // Get days for current month
+    const monthDays = days.filter(day => {
+      const dayDate = new Date(day.day_date);
+      return dayDate >= start && dayDate <= end;
     });
 
-    // Group shifts by date
-    const shiftsByDate = monthShifts.reduce((acc, shift) => {
-      const dateKey = shift.date;
-      if (!acc[dateKey]) acc[dateKey] = [];
-      acc[dateKey].push(shift);
+    // Create a map for quick lookup
+    const daysByDate = monthDays.reduce((acc, day) => {
+      acc[day.day_date] = day;
       return acc;
-    }, {} as Record<string, any[]>);
+    }, {} as Record<string, any>);
 
-    // Create calendar days with shift data
-    const calendarDays = days.map(day => {
-      const dateKey = format(day, 'yyyy-MM-dd');
-      const dayShifts = shiftsByDate[dateKey] || [];
+    // Create calendar days with day data
+    const mappedCalendarDays = calendarDays.map(calendarDay => {
+      const dateKey = format(calendarDay, 'yyyy-MM-dd');
+      const dayData = daysByDate[dateKey];
       
       return {
-        date: day,
-        shifts: dayShifts,
-        totalHours: dayShifts.reduce((sum, shift) => sum + shift.duration, 0),
-        totalEarnings: dayShifts.reduce((sum, shift) => sum + shift.earnings, 0)
+        date: calendarDay,
+        shifts: [], // Will be populated on click
+        totalHours: dayData?.total_hours || 0,
+        totalEarnings: dayData?.total_hours * 15 || 0, // Estimate based on default rate
+        dayData
       };
     });
 
     // Calculate stats for current month
     const monthStats = {
-      totalHours: monthShifts.reduce((sum, shift) => sum + shift.duration, 0),
-      totalEarnings: monthShifts.reduce((sum, shift) => sum + shift.earnings, 0),
-      totalShifts: monthShifts.length,
-      activeDays: new Set(monthShifts.map(shift => shift.date)).size
+      totalHours: monthDays.reduce((sum, day) => sum + (day.total_hours || 0), 0),
+      totalEarnings: monthDays.reduce((sum, day) => sum + ((day.total_hours || 0) * 15), 0), // Estimate
+      totalShifts: monthDays.reduce((sum, day) => sum + (day.shift_count || 0), 0),
+      activeDays: monthDays.length
     };
 
-    return { calendarDays, monthStats };
-  }, [shifts, currentDate]);
+    return { calendarDays: mappedCalendarDays, monthStats };
+  }, [days, currentDate]);
 
   // NOW check for empty state AFTER all hooks
-  if (!shifts || !Array.isArray(shifts) || shifts.length === 0) {
+  if (!days || !Array.isArray(days) || days.length === 0) {
     return (
       <Card className="shadow-card border-dashed border-2">
         <CardContent className="text-center py-8">
           <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">No shifts recorded yet</h3>
-          <p className="text-muted-foreground mb-4">Start by adding your first shift manually or upload a rota image</p>
+          <p className="text-muted-foreground mb-4">Start by uploading shifts or adding them manually</p>
           <div className="flex flex-col sm:flex-row gap-2 justify-center">
             <Button asChild>
-              <Link to="/add-shift">Add First Shift</Link>
+              <Link to="/upload">Upload Shifts</Link>
             </Button>
           </div>
         </CardContent>
@@ -94,9 +84,15 @@ export default function CalendarWidget() {
     );
   }
 
-  const handleDateClick = (day: any) => {
+  const handleDateClick = async (day: any) => {
     setSelectedDate(day.date);
-    setSelectedShifts(day.shifts);
+    if (day.dayData) {
+      // Get detailed day with shifts
+      const dayWithShifts = await getDayWithShifts(day.dayData.day_date);
+      setSelectedShifts(dayWithShifts?.shifts || []);
+    } else {
+      setSelectedShifts([]);
+    }
   };
 
   const navigateMonth = (direction: 'prev' | 'next') => {
@@ -190,11 +186,11 @@ export default function CalendarWidget() {
                       {day.totalHours.toFixed(1)}h
                     </div>
                     <div className="flex flex-wrap gap-1">
-                      {day.shifts.slice(0, 1).map((shift, i) => (
-                        <Badge key={i} variant="secondary" className="text-xs px-1">
-                          {shift.clientName.split(' ')[0]}
-                        </Badge>
-                      ))}
+                       {day.shifts.slice(0, 1).map((shift, i) => (
+                         <Badge key={i} variant="secondary" className="text-xs px-1">
+                           {shift.client_name?.split(' ')[0] || 'Shift'}
+                         </Badge>
+                       ))}
                       {day.shifts.length > 1 && (
                         <Badge variant="outline" className="text-xs px-1">
                           +{day.shifts.length - 1}
@@ -272,37 +268,37 @@ export default function CalendarWidget() {
                 {/* Scrollable Shifts List */}
                 <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-4">
                   <div className="space-y-3">
-                    {selectedShifts.map((shift, index) => (
-                      <Card key={index} className="border border-border/50 shadow-sm hover:shadow-md transition-shadow">
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-foreground mb-2">{shift.clientName}</h4>
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                  <Clock className="w-4 h-4 shrink-0" />
-                                  <span>{shift.startTime} - {shift.endTime}</span>
-                                  <Badge variant="secondary" className="ml-2">
-                                    {shift.duration}h
-                                  </Badge>
-                                </div>
-                                {shift.location && (
-                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <MapPin className="w-4 h-4 shrink-0" />
-                                    <span className="truncate">{shift.location}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-right shrink-0">
-                              <div className="text-lg font-semibold text-primary">
-                                £{shift.earnings.toFixed(2)}
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                     {selectedShifts.map((shift, index) => (
+                       <Card key={index} className="border border-border/50 shadow-sm hover:shadow-md transition-shadow">
+                         <CardContent className="p-4">
+                           <div className="flex items-start justify-between gap-4">
+                             <div className="flex-1 min-w-0">
+                               <h4 className="font-semibold text-foreground mb-2">{shift.client_name}</h4>
+                               <div className="space-y-1">
+                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                   <Clock className="w-4 h-4 shrink-0" />
+                                   <span>{shift.start_time} - {shift.end_time}</span>
+                                   <Badge variant="secondary" className="ml-2">
+                                     {shift.duration}h
+                                   </Badge>
+                                 </div>
+                                 {shift.location && (
+                                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                     <MapPin className="w-4 h-4 shrink-0" />
+                                     <span className="truncate">{shift.location}</span>
+                                   </div>
+                                 )}
+                               </div>
+                             </div>
+                             <div className="text-right shrink-0">
+                               <div className="text-lg font-semibold text-primary">
+                                 £{shift.earnings.toFixed(2)}
+                               </div>
+                             </div>
+                           </div>
+                         </CardContent>
+                       </Card>
+                     ))}
                   </div>
                 </div>
               </div>

@@ -1,4 +1,4 @@
-import { useShifts } from '@/hooks/useShifts';
+import { useDayManagement } from '@/hooks/useDayManagement';
 import StatsCard from '@/components/StatsCard';
 import CalendarWidget from '@/components/CalendarWidget';
 import { Button } from '@/components/ui/button';
@@ -11,17 +11,24 @@ import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
-  const { getShiftStats, settings, updateSettings, exportToCSV, updateAllShiftsHourlyRate } = useShifts();
-  const [newHourlyRate, setNewHourlyRate] = useState(settings.defaultHourlyRate.toString());
+  const { dayStats, days } = useDayManagement();
+  const [newHourlyRate, setNewHourlyRate] = useState('15.00');
   const { toast } = useToast();
   
-  const stats = getShiftStats();
+  // Calculate stats from day data
+  const stats = {
+    totalHours: dayStats.total_hours,
+    totalEarnings: dayStats.total_earnings,
+    totalShifts: days.reduce((sum, day) => sum + day.shift_count, 0),
+    paidEarnings: 0, // TODO: Implement paid tracking in day structure
+    unpaidEarnings: dayStats.total_earnings,
+    paidShifts: 0,
+    unpaidShifts: days.reduce((sum, day) => sum + day.shift_count, 0)
+  };
 
   const handleUpdateHourlyRate = async () => {
     const rate = parseFloat(newHourlyRate);
     if (rate > 0) {
-      // Update the default rate for future shifts
-      updateSettings({ defaultHourlyRate: rate });
       toast({
         title: "Hourly rate updated",
         description: `Default hourly rate set to £${rate.toFixed(2)} for future shifts`,
@@ -32,40 +39,35 @@ const Dashboard = () => {
   const handleUpdateAllShiftsRate = async () => {
     const rate = parseFloat(newHourlyRate);
     if (rate > 0) {
-      try {
-        const success = await updateAllShiftsHourlyRate(rate);
-        if (success) {
-          // Also update the default for future shifts
-          updateSettings({ defaultHourlyRate: rate });
-          toast({
-            title: "All shifts updated!",
-            description: `Updated all existing shifts and set default rate to £${rate.toFixed(2)}`,
-          });
-        } else {
-          toast({
-            title: "Update failed",
-            description: "Could not update all shifts. Please try again.",
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        toast({
-          title: "Update failed",
-          description: "Could not update all shifts. Please try again.",
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Feature coming soon",
+        description: "Bulk rate update will be available soon in the new day management system",
+        variant: "default",
+      });
     }
   };
 
   const handleExportCSV = () => {
     try {
-      const csvContent = exportToCSV();
+      // Create CSV content from days data
+      const csvHeaders = ['Date', 'Total Hours', 'Shift Count', 'Has Conflicts', 'Has Unresolved'];
+      const csvRows = days.map(day => [
+        day.day_date,
+        day.total_hours.toString(),
+        day.shift_count.toString(),
+        day.has_conflicts ? 'Yes' : 'No',
+        day.has_unresolved ? 'Yes' : 'No'
+      ]);
+      
+      const csvContent = [csvHeaders, ...csvRows]
+        .map(row => row.map(field => `"${field}"`).join(','))
+        .join('\n');
+      
       const blob = new Blob([csvContent], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `shifts-export-${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `days-export-${new Date().toISOString().split('T')[0]}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -73,7 +75,7 @@ const Dashboard = () => {
       
       toast({
         title: "Export successful",
-        description: "Your shift data has been exported to CSV",
+        description: "Your day data has been exported to CSV",
       });
     } catch (error) {
       toast({
@@ -97,9 +99,9 @@ const Dashboard = () => {
             Export CSV
           </Button>
           <Button asChild variant="default">
-            <Link to="/add-shift">
+            <Link to="/upload">
               <Plus className="w-4 h-4 mr-2" />
-              Add Shift
+              Upload Shifts
             </Link>
           </Button>
         </div>

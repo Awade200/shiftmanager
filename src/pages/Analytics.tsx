@@ -3,14 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { TrendingUp, PoundSterling, Clock, Users, Calculator, Receipt } from 'lucide-react';
-import { useShifts } from '@/hooks/useShifts';
+import { useDayManagement } from '@/hooks/useDayManagement';
 import { useTaxCalculation } from '@/hooks/useTaxCalculation';
-import { format, startOfWeek, startOfMonth, isAfter, isBefore } from 'date-fns';
+import { format, startOfWeek, startOfMonth, isAfter, isBefore, parseISO } from 'date-fns';
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
 
 export default function Analytics() {
-  const { shifts } = useShifts();
+  const { days, dayStats } = useDayManagement();
   const { calculateTax } = useTaxCalculation();
 
   const analytics = useMemo(() => {
@@ -18,62 +18,51 @@ export default function Analytics() {
     const weekStart = startOfWeek(now, { weekStartsOn: 1 });
     const monthStart = startOfMonth(now);
 
-    // Filter shifts for current week and month
-    const weekShifts = shifts.filter(shift => 
-      isAfter(new Date(shift.date), weekStart) || 
-      shift.date === format(weekStart, 'yyyy-MM-dd')
-    );
+    // Filter days for current week and month
+    const weekDays = days.filter(day => {
+      const dayDate = parseISO(day.day_date);
+      return isAfter(dayDate, weekStart) || day.day_date === format(weekStart, 'yyyy-MM-dd');
+    });
     
-    const monthShifts = shifts.filter(shift => 
-      isAfter(new Date(shift.date), monthStart) || 
-      shift.date === format(monthStart, 'yyyy-MM-dd')
-    );
+    const monthDays = days.filter(day => {
+      const dayDate = parseISO(day.day_date);
+      return isAfter(dayDate, monthStart) || day.day_date === format(monthStart, 'yyyy-MM-dd');
+    });
 
-    // Calculate totals
+    // Calculate totals (using estimated earnings with default rate)
     const weekStats = {
-      hours: weekShifts.reduce((sum, shift) => sum + shift.duration, 0),
-      gross: weekShifts.reduce((sum, shift) => sum + shift.earnings, 0),
-      shifts: weekShifts.length
+      hours: weekDays.reduce((sum, day) => sum + (day.total_hours || 0), 0),
+      gross: weekDays.reduce((sum, day) => sum + ((day.total_hours || 0) * 15), 0), // Estimated with £15/hr
+      shifts: weekDays.reduce((sum, day) => sum + (day.shift_count || 0), 0)
     };
 
     const monthStats = {
-      hours: monthShifts.reduce((sum, shift) => sum + shift.duration, 0),
-      gross: monthShifts.reduce((sum, shift) => sum + shift.earnings, 0),
-      shifts: monthShifts.length
+      hours: monthDays.reduce((sum, day) => sum + (day.total_hours || 0), 0),
+      gross: monthDays.reduce((sum, day) => sum + ((day.total_hours || 0) * 15), 0), // Estimated with £15/hr
+      shifts: monthDays.reduce((sum, day) => sum + (day.shift_count || 0), 0)
     };
 
     // Calculate tax deductions
     const weekTax = calculateTax(weekStats.gross);
     const monthTax = calculateTax(monthStats.gross);
 
-    // Client breakdown
-    const clientData = shifts.reduce((acc, shift) => {
-      const existing = acc.find(item => item.name === shift.clientName);
-      if (existing) {
-        existing.hours += shift.duration;
-        existing.earnings += shift.earnings;
-      } else {
-        acc.push({
-          name: shift.clientName,
-          hours: shift.duration,
-          earnings: shift.earnings
-        });
-      }
-      return acc;
-    }, [] as { name: string; hours: number; earnings: number }[]);
+    // Simplified client data - we'll need to implement this properly with day->shift details
+    const clientData = [
+      { name: 'Various Clients', hours: dayStats.total_hours, earnings: dayStats.total_hours * 15 }
+    ];
 
     // Daily trends for last 7 days
     const dailyTrends = Array.from({ length: 7 }, (_, i) => {
       const date = new Date();
       date.setDate(date.getDate() - (6 - i));
       const dateStr = format(date, 'yyyy-MM-dd');
-      const dayShifts = shifts.filter(shift => shift.date === dateStr);
+      const dayData = days.find(day => day.day_date === dateStr);
       
       return {
         date: format(date, 'EEE'),
-        hours: dayShifts.reduce((sum, shift) => sum + shift.duration, 0),
-        earnings: dayShifts.reduce((sum, shift) => sum + shift.earnings, 0),
-        shifts: dayShifts.length
+        hours: dayData?.total_hours || 0,
+        earnings: (dayData?.total_hours || 0) * 15, // Estimated
+        shifts: dayData?.shift_count || 0
       };
     });
 
@@ -85,7 +74,7 @@ export default function Analytics() {
       clientData: clientData.slice(0, 6), // Top 6 clients
       dailyTrends
     };
-  }, [shifts, calculateTax]);
+  }, [days, dayStats, calculateTax]);
 
   const StatCard = ({ title, value, subtitle, icon: Icon, trend }: any) => (
     <Card>

@@ -1,32 +1,43 @@
-import { useMemo } from 'react';
-import { useShifts } from '@/hooks/useShifts';
-import { Shift } from '@/types/shift';
+import { useMemo, useEffect, useState } from 'react';
+import { useDayManagement } from '@/hooks/useDayManagement';
+import { DayShift } from '@/types/day';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Clock, MapPin, User, DollarSign } from 'lucide-react';
 import { format, isToday, parseISO } from 'date-fns';
 
 const TodaysShifts = () => {
-  const { shifts } = useShifts();
+  const { getDayWithShifts } = useDayManagement();
+  const [todaysShifts, setTodaysShifts] = useState<DayShift[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const todaysShifts = useMemo(() => {
-    const today = new Date();
-    const filtered = shifts.filter(shift => {
+  useEffect(() => {
+    const loadTodaysShifts = async () => {
       try {
-        const shiftDate = parseISO(shift.date);
-        return isToday(shiftDate);
-      } catch {
-        return false;
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const dayWithShifts = await getDayWithShifts(today);
+        
+        if (dayWithShifts?.shifts) {
+          // Sort by start time
+          const sorted = dayWithShifts.shifts.sort((a, b) => {
+            const timeA = a.start_time.replace(':', '');
+            const timeB = b.start_time.replace(':', '');
+            return timeA.localeCompare(timeB);
+          });
+          setTodaysShifts(sorted);
+        } else {
+          setTodaysShifts([]);
+        }
+      } catch (error) {
+        console.error('Error loading today\'s shifts:', error);
+        setTodaysShifts([]);
+      } finally {
+        setLoading(false);
       }
-    });
+    };
 
-    // Sort by start time
-    return filtered.sort((a, b) => {
-      const timeA = a.startTime.replace(':', '');
-      const timeB = b.startTime.replace(':', '');
-      return timeA.localeCompare(timeB);
-    });
-  }, [shifts]);
+    loadTodaysShifts();
+  }, [getDayWithShifts]);
 
   const formatTime = (time: string) => {
     try {
@@ -35,6 +46,17 @@ const TodaysShifts = () => {
       return time;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto p-4 space-y-6">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-foreground mb-2">Today's Shifts</h1>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (todaysShifts.length === 0) {
     return (
@@ -80,10 +102,10 @@ const TodaysShifts = () => {
                   <div className="flex items-center gap-2">
                     <User className="w-4 h-4 text-primary" />
                     <span className="font-semibold text-foreground text-lg">
-                      {shift.clientName}
+                      {shift.client_name}
                     </span>
-                    <Badge variant={shift.isPaid ? "default" : "secondary"}>
-                      {shift.isPaid ? 'Paid' : 'Unpaid'}
+                    <Badge variant={shift.is_paid ? "default" : "secondary"}>
+                      {shift.is_paid ? 'Paid' : 'Unpaid'}
                     </Badge>
                   </div>
                   
@@ -98,7 +120,7 @@ const TodaysShifts = () => {
                     <Clock className="w-4 h-4 text-primary" />
                     <div className="text-center sm:text-right">
                       <div className="font-semibold text-foreground">
-                        {formatTime(shift.startTime)} - {formatTime(shift.endTime)}
+                        {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {shift.duration.toFixed(1)} hours
@@ -113,7 +135,7 @@ const TodaysShifts = () => {
                         £{shift.earnings.toFixed(2)}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        £{shift.hourlyRate.toFixed(2)}/hr
+                        £{shift.hourly_rate.toFixed(2)}/hr
                       </div>
                     </div>
                   </div>
