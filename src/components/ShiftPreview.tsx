@@ -9,13 +9,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ShiftRow } from '@/lib/shiftParser';
 import { useClientProfiles } from '@/hooks/useClientProfiles';
 import { useConflictDetection } from '@/hooks/useConflictDetection';
-import { useWorkloadAnalysis } from '@/hooks/useWorkloadAnalysis';
 import { useShifts } from '@/hooks/useShifts';
 import { useToast } from '@/hooks/use-toast';
 import { DuplicateCheckResult, UpdateChoice } from '@/types/duplicateHandling';
 import { ShiftFormData } from '@/types/shift';
 import ConflictResolutionModal from './ConflictResolutionModal';
-import { WorkloadWarningsDisplay } from './WorkloadWarningsDisplay';
 
 interface ShiftPreviewProps {
   shifts: ShiftRow[];
@@ -37,14 +35,12 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
   const [editedShifts, setEditedShifts] = useState<Record<string, Partial<ShiftRow>>>({});
   const [groupBy, setGroupBy] = useState<'none' | 'day' | 'client'>('none');
   const [conflictResults, setConflictResults] = useState<DuplicateCheckResult[]>([]);
-  const [workloadWarnings, setWorkloadWarnings] = useState<any[]>([]);
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [isCheckingConflicts, setIsCheckingConflicts] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
   const { findClientLocation, saveClientProfile } = useClientProfiles();
   const { checkForConflicts, processShiftsWithChoices, isProcessing } = useConflictDetection();
-  const { analyzeWorkload } = useWorkloadAnalysis();
   const { settings } = useShifts();
   const { toast } = useToast();
 
@@ -208,11 +204,6 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
         setConflictResults(results);
         setShowConflictModal(true);
       } else {
-        // Check workload separately
-        const warnings = analyzeWorkload(shiftFormData);
-        if (warnings.length > 0) {
-          setWorkloadWarnings(warnings);
-        }
         toast({
           title: "No time conflicts found",
           description: "All shifts are ready to save.",
@@ -516,13 +507,6 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
         conflicts={conflictResults}
         onChoicesMade={handleConflictChoices}
       />
-      
-      {workloadWarnings.length > 0 && (
-        <div className="mt-4">
-          <h3 className="text-lg font-semibold mb-3">Workload Analysis</h3>
-          <WorkloadWarningsDisplay warnings={workloadWarnings} />
-        </div>
-      )}
     </div>
   );
 }
