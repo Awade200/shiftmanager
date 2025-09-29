@@ -117,7 +117,7 @@ export function useDayManagement() {
         is_paid: shift.isPaid,
         status: 'ready',
         shift_key: `${shift.date}_${shift.startTime}_${shift.endTime}_${shift.clientName}`,
-        mobile_number: 'default' // Will be updated with proper mobile auth
+        mobile_number: 'default-mobile' // Fixed to match mobile_auth table
       }));
 
       const { data, error } = await supabase
