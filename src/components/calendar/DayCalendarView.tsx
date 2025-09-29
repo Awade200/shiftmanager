@@ -95,9 +95,7 @@ export function DayCalendarView({
         )}
         onClick={() => {
           onDateChange(date);
-          if (dayData) {
-            onDayClick(dateKey);
-          }
+          onDayClick(dateKey);
         }}
       >
         {/* Date number */}
