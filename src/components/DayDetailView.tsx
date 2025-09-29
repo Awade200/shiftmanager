@@ -38,41 +38,21 @@ export function DayDetailView({ dayDate, onClose, className }: DayDetailViewProp
   const [editedValues, setEditedValues] = useState<Partial<DayShift>>({});
   const [loading, setLoading] = useState(true);
 
-  const { user } = useMobileAuth();
+  const { user, loading: authLoading } = useMobileAuth();
   const { getDayWithShifts, calculateDuration } = useDayManagement(user?.mobile_number);
   const { checkDayConflicts } = useConflictDetection();
   const { toast } = useToast();
 
   useEffect(() => {
-    loadDayData();
-  }, [dayDate]);
+    if (!authLoading && user?.mobile_number) {
+      loadDayData();
+    }
+  }, [dayDate, authLoading, user]);
 
   const loadDayData = async () => {
     try {
       setLoading(true);
-      console.log('Loading day data for:', dayDate, 'mobile:', user?.mobile_number);
-      
-      if (!user?.mobile_number) {
-        toast({
-          title: "Error",
-          description: "User not authenticated",
-          variant: "destructive"
-        });
-        return;
-      }
-      
       const data = await getDayWithShifts(dayDate);
-      console.log('Day data loaded:', data);
-      
-      if (!data) {
-        // Day doesn't exist yet - show empty state
-        toast({
-          title: "No Data",
-          description: "No shifts found for this day",
-          variant: "default"
-        });
-      }
-      
       setDayData(data);
     } catch (err) {
       console.error('Error loading day data:', err);
@@ -237,7 +217,7 @@ export function DayDetailView({ dayDate, onClose, className }: DayDetailViewProp
     );
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
