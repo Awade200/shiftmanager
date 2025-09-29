@@ -5,25 +5,25 @@ import { Progress } from '@/components/ui/progress';
 import { useOCR } from '@/hooks/useOCR';
 import { useShifts } from '@/hooks/useShifts';
 import { useClientProfiles } from '@/hooks/useClientProfiles';
-import { useDuplicateHandling } from '@/hooks/useDuplicateHandling';
+import { useConflictDetection } from '@/hooks/useConflictDetection';
 import { OCRResult, ShiftFormData } from '@/types/shift';
 import { DuplicateCheckResult, UpdateChoice } from '@/types/duplicateHandling';
 import { Upload, FileImage, AlertCircle, CheckCircle, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import DuplicateHandlingModal from './DuplicateHandlingModal';
+import ConflictResolutionModal from './ConflictResolutionModal';
 import ShiftPreviewSummary from './ShiftPreviewSummary';
 
 const OCRUpload = () => {
   const { extractShiftsFromImage, loading, progress } = useOCR();
   const { settings } = useShifts();
   const { findClientLocation, saveClientProfile } = useClientProfiles();
-  const { checkForDuplicates, processShiftsWithChoices } = useDuplicateHandling();
+  const { checkForConflicts, processShiftsWithChoices } = useConflictDetection();
   const { toast } = useToast();
   
   const [extractedShifts, setExtractedShifts] = useState<(OCRResult & { hourlyRate: number; isPaid: boolean })[]>([]);
-  const [duplicateResults, setDuplicateResults] = useState<DuplicateCheckResult[]>([]);
+  const [conflictResults, setConflictResults] = useState<DuplicateCheckResult[]>([]);
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [dragActive, setDragActive] = useState(false);
 
@@ -138,10 +138,10 @@ const OCRUpload = () => {
     }));
 
     try {
-      const results = await checkForDuplicates(shiftFormData);
-      setDuplicateResults(results);
+      const results = await checkForConflicts(shiftFormData);
+      setConflictResults(results);
 
-      const conflicts = results.filter(r => r.status === 'potential_update');
+      const conflicts = results.filter(r => r.status !== 'new');
       if (conflicts.length > 0) {
         setShowConflictModal(true);
         return;
@@ -161,7 +161,7 @@ const OCRUpload = () => {
   const handleDirectSave = async (results: DuplicateCheckResult[]) => {
     const defaultChoices: UpdateChoice[] = results.map(result => ({
       shiftId: result.id,
-      action: 'update'
+      action: 'replace'
     }));
 
     try {
@@ -181,7 +181,7 @@ const OCRUpload = () => {
       });
 
       setExtractedShifts([]);
-      setDuplicateResults([]);
+      setConflictResults([]);
     } catch (error) {
       toast({
         title: "Save failed",
@@ -391,13 +391,13 @@ const OCRUpload = () => {
         </Card>
       )}
 
-      <DuplicateHandlingModal
+      <ConflictResolutionModal
         isOpen={showConflictModal}
         onClose={() => setShowConflictModal(false)}
-        conflicts={duplicateResults.filter(r => r.status === 'potential_update')}
+        conflicts={conflictResults.filter(r => r.status !== 'new')}
         onChoicesMade={async (choices) => {
           try {
-            await processShiftsWithChoices(duplicateResults, choices);
+            await processShiftsWithChoices(conflictResults, choices);
             if (settings.autoSaveClientLocations) {
               for (const shift of extractedShifts) {
                 if (shift.clientName && shift.location) {
@@ -410,7 +410,7 @@ const OCRUpload = () => {
               description: `Processed ${extractedShifts.length} shifts from OCR`,
             });
             setExtractedShifts([]);
-            setDuplicateResults([]);
+            setConflictResults([]);
             setShowConflictModal(false);
           } catch (error) {
             toast({

@@ -23,11 +23,10 @@ export default function ShiftPreviewSummary({ results }: ShiftPreviewSummaryProp
     switch (status) {
       case 'new':
         return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'potential_update':
-        return <RotateCcw className="w-4 h-4 text-blue-500" />;
-      case 'duplicate':
-        return <X className="w-4 h-4 text-gray-500" />;
-      case 'needs_location':
+      case 'exact':
+      case 'partial':
+      case 'contained':
+      case 'contains':
         return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
       default:
         return null;
@@ -38,12 +37,14 @@ export default function ShiftPreviewSummary({ results }: ShiftPreviewSummaryProp
     switch (status) {
       case 'new':
         return 'New (to be added)';
-      case 'potential_update':
-        return 'Update (hours will change)';
-      case 'duplicate':
-        return 'Duplicate (skipped)';
-      case 'needs_location':
-        return 'Needs location';
+      case 'exact':
+        return 'Exact duplicate';
+      case 'partial':
+        return 'Partial overlap';
+      case 'contained':
+        return 'Contained within existing';
+      case 'contains':
+        return 'Contains existing shift';
       default:
         return status;
     }
@@ -53,11 +54,10 @@ export default function ShiftPreviewSummary({ results }: ShiftPreviewSummaryProp
     switch (status) {
       case 'new':
         return 'default' as const;
-      case 'potential_update':
-        return 'secondary' as const;
-      case 'duplicate':
-        return 'outline' as const;
-      case 'needs_location':
+      case 'exact':
+      case 'partial':
+      case 'contained':
+      case 'contains':
         return 'destructive' as const;
       default:
         return 'outline' as const;
@@ -72,24 +72,24 @@ export default function ShiftPreviewSummary({ results }: ShiftPreviewSummaryProp
   };
 
   // Calculate totals
-  const newShifts = results.filter(r => r.status === 'new').length;
-  const updateShifts = results.filter(r => r.status === 'potential_update').length;
-  const duplicateShifts = results.filter(r => r.status === 'duplicate').length;
-  const needsLocationShifts = results.filter(r => r.status === 'needs_location').length;
+  const statusCounts = results.reduce((counts, shift) => {
+    if (shift.status === 'exact' || shift.status === 'partial' || shift.status === 'contained' || shift.status === 'contains') {
+      counts.conflicts++;
+    } else {
+      counts.new++;
+    }
+    return counts;
+  }, { new: 0, conflicts: 0 });
 
   const newHours = results
     .filter(r => r.status === 'new')
     .reduce((sum, r) => sum + calculateDuration(r.newShift.startTime, r.newShift.endTime), 0);
     
-  const updateHours = results
-    .filter(r => r.status === 'potential_update')
-    .reduce((sum, r) => sum + calculateDuration(r.newShift.startTime, r.newShift.endTime), 0);
-    
-  const duplicateHours = results
-    .filter(r => r.status === 'duplicate')
+  const conflictHours = results
+    .filter(r => r.status !== 'new')
     .reduce((sum, r) => sum + calculateDuration(r.newShift.startTime, r.newShift.endTime), 0);
 
-  const totalHours = newHours + updateHours + duplicateHours;
+  const totalHours = newHours + conflictHours;
 
   return (
     <Card className="mb-4">
@@ -97,8 +97,20 @@ export default function ShiftPreviewSummary({ results }: ShiftPreviewSummaryProp
         <CardTitle className="text-lg">Import Preview & Summary</CardTitle>
       </CardHeader>
       <CardContent>
+        {/* Summary Stats */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-green-600">{statusCounts.new}</div>
+            <div className="text-sm text-gray-600">New Shifts</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-yellow-600">{statusCounts.conflicts}</div>
+            <div className="text-sm text-gray-600">Conflicts</div>
+          </div>
+        </div>
+
         {/* Shifts List */}
-        <div className="space-y-2 mb-6">
+        <div className="space-y-2 mt-6">
           {results.map((result, index) => (
             <div key={result.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
               <div className="flex items-center gap-3">
@@ -109,9 +121,9 @@ export default function ShiftPreviewSummary({ results }: ShiftPreviewSummaryProp
                   </span>
                   <div className="text-sm text-muted-foreground">
                     {result.newShift.startTime} – {result.newShift.endTime}
-                    {result.status === 'potential_update' && result.existingShift && (
-                      <span className="text-blue-600 ml-2">
-                        (was {result.existingShift.startTime} – {result.existingShift.endTime})
+                    {result.status !== 'new' && result.existingShift && (
+                      <span className="text-yellow-600 ml-2">
+                        (conflicts with {result.existingShift.startTime} – {result.existingShift.endTime})
                       </span>
                     )}
                   </div>
@@ -124,34 +136,12 @@ export default function ShiftPreviewSummary({ results }: ShiftPreviewSummaryProp
           ))}
         </div>
 
-        {/* Summary Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/20 rounded-lg">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{newShifts}</div>
-            <div className="text-sm text-muted-foreground">New shifts</div>
-            <div className="text-xs font-medium">{newHours.toFixed(1)}h</div>
-          </div>
-          
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{updateShifts}</div>
-            <div className="text-sm text-muted-foreground">Updates</div>
-            <div className="text-xs font-medium">+{updateHours.toFixed(1)}h</div>
-          </div>
-          
-          <div className="text-center">
-            <div className="text-2xl font-bold text-gray-600">{duplicateShifts}</div>
-            <div className="text-sm text-muted-foreground">Skipped</div>
-            <div className="text-xs font-medium">{duplicateHours.toFixed(1)}h</div>
-          </div>
-          
-          <div className="text-center">
-            <div className="text-2xl font-bold">{totalHours.toFixed(1)}</div>
-            <div className="text-sm text-muted-foreground">Total hours</div>
-            {needsLocationShifts > 0 && (
-              <div className="text-xs text-destructive font-medium">
-                {needsLocationShifts} need location
-              </div>
-            )}
+        {/* Total Hours */}
+        <div className="text-center mt-4 p-4 bg-muted/20 rounded-lg">
+          <div className="text-2xl font-bold">{totalHours.toFixed(1)}</div>
+          <div className="text-sm text-muted-foreground">Total hours</div>
+          <div className="text-xs text-muted-foreground mt-1">
+            {newHours.toFixed(1)}h new + {conflictHours.toFixed(1)}h conflicts
           </div>
         </div>
       </CardContent>

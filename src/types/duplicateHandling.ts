@@ -8,7 +8,8 @@ export interface WorkloadWarning {
 
 export interface DuplicateCheckResult {
   id: string;
-  status: 'new' | 'duplicate' | 'potential_update' | 'needs_location' | 'workload_warning';
+  status: 'new' | 'exact' | 'partial' | 'contained' | 'contains';
+  overlapType?: 'exact' | 'partial' | 'contained' | 'contains';
   existingShift?: {
     id: string;
     startTime: string;
@@ -23,25 +24,31 @@ export interface DuplicateCheckResult {
     location?: string;
     hourlyRate: number;
   };
-  conflicts?: {
-    startTime?: boolean;
-    endTime?: boolean;
-  };
-  workloadWarnings?: WorkloadWarning[];
+  conflictingShifts?: Array<{
+    id: string;
+    startTime: string;
+    endTime: string;
+    clientName: string;
+  }>;
 }
 
 export interface UpdateChoice {
   shiftId: string;
-  action: 'update' | 'keep_both' | 'skip' | 'proceed_with_warning';
+  action: 'replace' | 'skip' | 'split' | 'edit';
+  editedShift?: {
+    startTime: string;
+    endTime: string;
+  };
 }
 
 export interface SaveSummary {
   newShifts: number;
-  updatedShifts: number;
+  replacedShifts: number;
   skippedShifts: number;
+  splitShifts: number;
   totalHours: number;
   newHours: number;
-  updatedHours: number;
+  replacedHours: number;
   skippedHours: number;
-  workloadWarnings: WorkloadWarning[];
+  splitHours: number;
 }

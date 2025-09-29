@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Edit3, MapPin, Clock, AlertCircle, CheckCircle, RefreshCw, Trash2, Save, Loader2 } from 'lucide-react';
+import { Edit3, MapPin, Clock, AlertCircle, CheckCircle, RefreshCw, Trash2, Save, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,12 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ShiftRow } from '@/lib/shiftParser';
 import { useClientProfiles } from '@/hooks/useClientProfiles';
-import { useDuplicateHandling } from '@/hooks/useDuplicateHandling';
+import { useConflictDetection } from '@/hooks/useConflictDetection';
+import { useWorkloadAnalysis } from '@/hooks/useWorkloadAnalysis';
 import { useShifts } from '@/hooks/useShifts';
 import { useToast } from '@/hooks/use-toast';
 import { DuplicateCheckResult, UpdateChoice } from '@/types/duplicateHandling';
 import { ShiftFormData } from '@/types/shift';
-import DuplicateHandlingModal from './DuplicateHandlingModal';
+import ConflictResolutionModal from './ConflictResolutionModal';
+import { WorkloadWarningsDisplay } from './WorkloadWarningsDisplay';
 
 interface ShiftPreviewProps {
   shifts: ShiftRow[];
@@ -34,13 +36,15 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedShifts, setEditedShifts] = useState<Record<string, Partial<ShiftRow>>>({});
   const [groupBy, setGroupBy] = useState<'none' | 'day' | 'client'>('none');
-  const [duplicateResults, setDuplicateResults] = useState<DuplicateCheckResult[]>([]);
+  const [conflictResults, setConflictResults] = useState<DuplicateCheckResult[]>([]);
+  const [workloadWarnings, setWorkloadWarnings] = useState<any[]>([]);
   const [showConflictModal, setShowConflictModal] = useState(false);
-  const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
+  const [isCheckingConflicts, setIsCheckingConflicts] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
   const { findClientLocation, saveClientProfile } = useClientProfiles();
-  const { checkForDuplicates, processShiftsWithChoices, isProcessing } = useDuplicateHandling();
+  const { checkForConflicts, processShiftsWithChoices, isProcessing } = useConflictDetection();
+  const { analyzeWorkload } = useWorkloadAnalysis();
   const { settings } = useShifts();
   const { toast } = useToast();
 
@@ -178,9 +182,9 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
     });
   };
 
-  const handleCheckDuplicates = async () => {
+  const handleCheckConflicts = async () => {
     try {
-      setIsCheckingDuplicates(true);
+      setIsCheckingConflicts(true);
       const shiftsToCheck = shiftsWithIds.map(shift => ({
         ...shift,
         ...editedShifts[shift.id]
@@ -196,31 +200,33 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
         isPaid: false
       }));
 
-      const duplicateResults = await checkForDuplicates(shiftFormData);
+      const results = await checkForConflicts(shiftFormData);
       
-      // Show modal for any warnings or conflicts
-      if (duplicateResults.some(r => 
-        r.status !== 'new' || 
-        (r.workloadWarnings && r.workloadWarnings.length > 0)
-      )) {
-        setDuplicateResults(duplicateResults);
+      const hasConflicts = results.some(r => r.status !== 'new');
+      
+      if (hasConflicts) {
+        setConflictResults(results);
         setShowConflictModal(true);
       } else {
-        // No issues found, show success message
+        // Check workload separately
+        const warnings = analyzeWorkload(shiftFormData);
+        if (warnings.length > 0) {
+          setWorkloadWarnings(warnings);
+        }
         toast({
-          title: "No issues detected",
-          description: "All shifts look good to save!",
+          title: "No time conflicts found",
+          description: "All shifts are ready to save.",
         });
       }
     } catch (error) {
-      console.error('Duplicate check failed:', error);
+      console.error('Conflict check failed:', error);
       toast({
         title: "Check failed",
-        description: "Could not check for duplicates",
+        description: "Could not check for conflicts",
         variant: "destructive"
       });
     } finally {
-      setIsCheckingDuplicates(false);
+      setIsCheckingConflicts(false);
     }
   };
 
@@ -242,22 +248,14 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
         isPaid: false
       }));
 
-      // Always check for duplicates and workload issues before saving
-      const duplicateResults = await checkForDuplicates(shiftFormData);
+      // Always check for conflicts before saving
+      const results = await checkForConflicts(shiftFormData);
+      const hasConflicts = results.some(r => r.status !== 'new');
       
-      const hasConflicts = duplicateResults.some(r => 
-        r.status === 'duplicate' || r.status === 'potential_update'
-      );
-      
-      const hasWarnings = duplicateResults.some(r => 
-        r.workloadWarnings && r.workloadWarnings.length > 0
-      );
-
-      if (hasConflicts || hasWarnings) {
-        setDuplicateResults(duplicateResults);
+      if (hasConflicts) {
+        setConflictResults(results);
         setShowConflictModal(true);
       } else {
-        // No conflicts or warnings, proceed with direct save
         await onSave(shiftFormData);
       }
     } catch (error) {
@@ -274,16 +272,16 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
 
   const handleConflictChoices = async (choices: UpdateChoice[]) => {
     try {
-      await processShiftsWithChoices(duplicateResults, choices);
+      const summary = await processShiftsWithChoices(conflictResults, choices);
       setShowConflictModal(false);
-      setDuplicateResults([]);
+      setConflictResults([]);
       
       // Clear the extracted shifts after successful save
       onShiftsUpdated([]);
       
       toast({
-        title: "Shifts processed successfully",
-        description: "All shifts have been saved according to your choices",
+        title: "Shifts saved successfully!",
+        description: `${summary.newShifts} new, ${summary.replacedShifts} replaced, ${summary.skippedShifts} skipped`,
       });
     } catch (error) {
       console.error('Failed to process shifts with choices:', error);
@@ -378,12 +376,12 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
         <div className="flex gap-2">
           <Button 
             variant="outline" 
-            onClick={handleCheckDuplicates}
-            disabled={isCheckingDuplicates}
+            onClick={handleCheckConflicts}
+            disabled={isCheckingConflicts}
             className="flex items-center gap-2"
           >
-            {isCheckingDuplicates && <Loader2 className="w-4 h-4 animate-spin" />}
-            <RefreshCw className="h-4 w-4" />
+            {isCheckingConflicts && <Loader2 className="w-4 h-4 animate-spin" />}
+            <AlertTriangle className="h-4 w-4" />
             Analyze Schedule
           </Button>
           <Button 
@@ -445,7 +443,7 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
                             <Input
                               type="date"
                               value={currentShift.date}
-                               onChange={(e) => handleEdit(shift as ShiftWithId, 'date', e.target.value)}
+                              onChange={(e) => handleEdit(shift as ShiftWithId, 'date', e.target.value)}
                               className="h-8"
                             />
                           ) : (
@@ -469,14 +467,13 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
                         <div>
                           <label className="text-xs text-muted-foreground">Time</label>
                           {isEditing ? (
-                            <div className="flex items-center gap-1">
+                            <div className="flex gap-1">
                               <Input
                                 type="time"
                                 value={currentShift.startTime}
                                 onChange={(e) => handleEdit(shift as ShiftWithId, 'startTime', e.target.value)}
                                 className="h-8"
                               />
-                              <span>-</span>
                               <Input
                                 type="time"
                                 value={currentShift.endTime}
@@ -485,7 +482,8 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
                               />
                             </div>
                           ) : (
-                            <div className="font-medium">
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
                               {currentShift.startTime} - {currentShift.endTime}
                             </div>
                           )}
@@ -493,29 +491,14 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
 
                         <div>
                           <label className="text-xs text-muted-foreground">Hours</label>
-                          {isEditing ? (
-                            <Input
-                              type="number"
-                              step="0.25"
-                              value={currentShift.hours}
-                              onChange={(e) => handleEdit(shift as ShiftWithId, 'hours', parseFloat(e.target.value))}
-                              className="h-8"
-                            />
-                          ) : (
-                            <div className="font-medium">{currentShift.hours}h</div>
-                          )}
+                          <div className="font-medium">{currentShift.hours}h</div>
                         </div>
                       </div>
 
                       {currentShift.service && (
-                        <div className="mt-2 text-sm text-muted-foreground">
-                          Service: {currentShift.service}
-                        </div>
-                      )}
-
-                      {status.message && (
-                        <div className="mt-2 text-sm text-muted-foreground">
-                          {status.message}
+                        <div className="mt-2">
+                          <label className="text-xs text-muted-foreground">Service: </label>
+                          <span className="text-sm">{currentShift.service}</span>
                         </div>
                       )}
                     </div>
@@ -527,16 +510,19 @@ export function ShiftPreview({ shifts, onShiftsUpdated, onSave }: ShiftPreviewPr
         ))}
       </div>
 
-      {/* Duplicate Handling Modal */}
-      <DuplicateHandlingModal
+      <ConflictResolutionModal
         isOpen={showConflictModal}
-        onClose={() => {
-          setShowConflictModal(false);
-          setDuplicateResults([]);
-        }}
-        conflicts={duplicateResults}
+        onClose={() => setShowConflictModal(false)}
+        conflicts={conflictResults}
         onChoicesMade={handleConflictChoices}
       />
+      
+      {workloadWarnings.length > 0 && (
+        <div className="mt-4">
+          <h3 className="text-lg font-semibold mb-3">Workload Analysis</h3>
+          <WorkloadWarningsDisplay warnings={workloadWarnings} />
+        </div>
+      )}
     </div>
   );
 }
