@@ -441,6 +441,45 @@ export type Database = {
           },
         ]
       }
+      days: {
+        Row: {
+          created_at: string
+          day_date: string
+          has_conflicts: boolean | null
+          has_unresolved: boolean | null
+          id: string
+          last_import_session_id: string | null
+          mobile_number: string
+          shift_count: number | null
+          total_hours: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_date: string
+          has_conflicts?: boolean | null
+          has_unresolved?: boolean | null
+          id?: string
+          last_import_session_id?: string | null
+          mobile_number: string
+          shift_count?: number | null
+          total_hours?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_date?: string
+          has_conflicts?: boolean | null
+          has_unresolved?: boolean | null
+          id?: string
+          last_import_session_id?: string | null
+          mobile_number?: string
+          shift_count?: number | null
+          total_hours?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       delivery_rates: {
         Row: {
           created_at: string
@@ -868,6 +907,39 @@ export type Database = {
           status?: string
           unit?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      import_sessions: {
+        Row: {
+          created_at: string
+          days_found: number | null
+          days_saved: number | null
+          days_skipped: number | null
+          id: string
+          mobile_number: string
+          session_data: Json | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          days_found?: number | null
+          days_saved?: number | null
+          days_skipped?: number | null
+          id?: string
+          mobile_number: string
+          session_data?: Json | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          days_found?: number | null
+          days_saved?: number | null
+          days_skipped?: number | null
+          id?: string
+          mobile_number?: string
+          session_data?: Json | null
+          status?: string
         }
         Relationships: []
       }
@@ -1469,6 +1541,7 @@ export type Database = {
           client_name: string
           created_at: string
           date: string
+          day_id: string | null
           duration: number
           earnings: number
           end_time: string
@@ -1479,6 +1552,7 @@ export type Database = {
           mobile_number: string | null
           shift_key: string
           start_time: string
+          status: string | null
           updated_at: string
           user_id: string
         }
@@ -1486,6 +1560,7 @@ export type Database = {
           client_name: string
           created_at?: string
           date: string
+          day_id?: string | null
           duration: number
           earnings: number
           end_time: string
@@ -1496,6 +1571,7 @@ export type Database = {
           mobile_number?: string | null
           shift_key: string
           start_time: string
+          status?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1503,6 +1579,7 @@ export type Database = {
           client_name?: string
           created_at?: string
           date?: string
+          day_id?: string | null
           duration?: number
           earnings?: number
           end_time?: string
@@ -1513,10 +1590,18 @@ export type Database = {
           mobile_number?: string | null
           shift_key?: string
           start_time?: string
+          status?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "shifts_day_id_fkey"
+            columns: ["day_id"]
+            isOneToOne: false
+            referencedRelation: "days"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "shifts_mobile_number_fkey"
             columns: ["mobile_number"]
@@ -1703,6 +1788,10 @@ export type Database = {
       }
       generate_slug: {
         Args: { input_text: string }
+        Returns: string
+      }
+      get_or_create_day: {
+        Args: { p_day_date: string; p_mobile_number: string }
         Returns: string
       }
       get_user_role: {
