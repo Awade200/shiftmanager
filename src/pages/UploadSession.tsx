@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, FileText, Camera, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,6 +17,7 @@ export default function UploadSession() {
   const [mobileNumber] = useState('default-mobile'); // TODO: Get from auth context
   const [selectedActions, setSelectedActions] = useState<Record<string, DayAction['type']>>({});
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null);
   
   const {
     currentSession,
@@ -311,7 +313,7 @@ export default function UploadSession() {
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                   }}
-                  onOpenDay={() => {}}
+                  onOpenDay={(dayDate) => setSelectedDayDate(dayDate)}
                   onReplaceDay={() => handleActionChange(day.date, 'replace')}
                   onMergeDay={() => handleActionChange(day.date, 'merge')}
                   onSkipDay={() => handleActionChange(day.date, 'skip')}
@@ -363,6 +365,54 @@ export default function UploadSession() {
           </Button>
         </div>
       )}
+
+      {/* Day Detail Dialog */}
+      <Dialog open={selectedDayDate !== null} onOpenChange={(open) => !open && setSelectedDayDate(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedDayDate && `Shifts for ${new Date(selectedDayDate).toLocaleDateString('en-GB', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}`}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedDayDate && (
+            <div className="space-y-4">
+              {parsedDays.find(d => d.date === selectedDayDate)?.shifts.map((shift, idx) => (
+                <Card key={shift.id} className="border-l-4 border-l-primary">
+                  <CardContent className="pt-4">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-2">
+                        <div className="font-semibold text-lg">{shift.client_name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {shift.start_time} - {shift.end_time}
+                        </div>
+                        {shift.location && (
+                          <div className="text-sm text-muted-foreground">{shift.location}</div>
+                        )}
+                      </div>
+                      <Badge variant={shift.status === 'ready' ? 'default' : 'destructive'}>
+                        {shift.status}
+                      </Badge>
+                    </div>
+                    {shift.errors && shift.errors.length > 0 && (
+                      <Alert variant="destructive" className="mt-4">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>
+                          {shift.errors.join(', ')}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
