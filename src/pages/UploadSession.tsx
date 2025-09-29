@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { useUploadSession } from '@/hooks/useUploadSession';
+import { useMobileAuth } from '@/hooks/useMobileAuth';
 import { useToast } from '@/hooks/use-toast';
 import { DayCard } from '@/components/DayCard';
 import { UnresolvedShifts } from '@/components/UnresolvedShifts';
@@ -14,7 +15,8 @@ import { ParsedDay, DayAction } from '@/types/day';
 
 export default function UploadSession() {
   const [uploadText, setUploadText] = useState('');
-  const [mobileNumber] = useState('default-mobile'); // TODO: Get from auth context
+  const { user } = useMobileAuth();
+  const mobileNumber = user?.mobile_number || '';
   const [selectedActions, setSelectedActions] = useState<Record<string, DayAction['type']>>({});
   const [isUploading, setIsUploading] = useState(false);
   const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null);
@@ -156,6 +158,19 @@ export default function UploadSession() {
     
     return { totalDays, mergeDays, replaceDays, skipDays };
   };
+
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-6">
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Please sign in to upload shifts.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">

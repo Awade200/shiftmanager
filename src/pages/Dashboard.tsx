@@ -1,4 +1,5 @@
 import { useDayManagement } from '@/hooks/useDayManagement';
+import { useMobileAuth } from '@/hooks/useMobileAuth';
 import StatsCard from '@/components/StatsCard';
 import CalendarWidget from '@/components/CalendarWidget';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,8 @@ import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
-  const { dayStats, days, deleteAllDays } = useDayManagement();
+  const { user } = useMobileAuth();
+  const { dayStats, days, deleteAllDays } = useDayManagement(user?.mobile_number);
   const [newHourlyRate, setNewHourlyRate] = useState('15.00');
   const { toast } = useToast();
   

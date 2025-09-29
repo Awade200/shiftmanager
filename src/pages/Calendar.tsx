@@ -6,6 +6,7 @@ import { DayCalendarView } from '@/components/calendar/DayCalendarView';
 import { WeekView } from '@/components/calendar/WeekView';
 import { DayDetailView } from '@/components/DayDetailView';
 import { useDayManagement } from '@/hooks/useDayManagement';
+import { useMobileAuth } from '@/hooks/useMobileAuth';
 
 type CalendarViewType = 'month' | 'week' | 'list';
 
@@ -14,7 +15,8 @@ export default function Calendar() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null);
   
-  const { days, loading, dayStats } = useDayManagement();
+  const { user } = useMobileAuth();
+  const { days, loading, dayStats } = useDayManagement(user?.mobile_number);
 
   const handleDayClick = (dayDate: string) => {
     setSelectedDayDate(dayDate);

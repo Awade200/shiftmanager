@@ -7,7 +7,7 @@ import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 
 const TIMEZONE = 'Europe/London';
 
-export function useDayManagement() {
+export function useDayManagement(mobileNumber?: string) {
   const [days, setDays] = useState<Day[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -18,9 +18,19 @@ export function useDayManagement() {
       setLoading(true);
       setError(null);
 
+      if (!mobileNumber) {
+        console.log('No mobile number, skipping load');
+        setDays([]);
+        setLoading(false);
+        return;
+      }
+
+      console.log('Loading days for mobile:', mobileNumber);
+      
       let query = supabase
         .from('days')
         .select('*')
+        .eq('mobile_number', mobileNumber)
         .order('day_date', { ascending: false });
 
       if (dateRange) {
@@ -47,21 +57,28 @@ export function useDayManagement() {
   // Get day with shifts
   const getDayWithShifts = async (dayDate: string): Promise<DayWithShifts | null> => {
     try {
-      const { data: dayData, error: dayError } = await supabase
+      if (!mobileNumber) return null;
+
+      let query = supabase
         .from('days')
         .select('*')
         .eq('day_date', dayDate)
-        .single();
+        .eq('mobile_number', mobileNumber);
+
+      const { data: dayData, error: dayError } = await query.single();
 
       if (dayError) {
         throw dayError;
       }
 
-      const { data: shiftsData, error: shiftsError } = await supabase
+      let shiftsQuery = supabase
         .from('shifts')
         .select('*')
         .eq('day_id', dayData.id)
+        .eq('mobile_number', mobileNumber)
         .order('start_time');
+
+      const { data: shiftsData, error: shiftsError } = await shiftsQuery;
 
       if (shiftsError) {
         throw shiftsError;
@@ -123,7 +140,7 @@ export function useDayManagement() {
         is_paid: shift.isPaid,
         status: 'ready',
         shift_key: `${shift.date}_${shift.startTime}_${shift.endTime}_${shift.clientName}`,
-        mobile_number: 'default-mobile' // Fixed to match mobile_auth table
+        mobile_number: mobileNumber
       }));
 
       console.log(`📤 Inserting ${shiftsToInsert.length} shifts:`, shiftsToInsert);
@@ -174,10 +191,15 @@ export function useDayManagement() {
   // Delete day
   const deleteDay = async (dayId: string): Promise<boolean> => {
     try {
-      const { error } = await supabase
+      if (!mobileNumber) return false;
+
+      let query = supabase
         .from('days')
         .delete()
-        .eq('id', dayId);
+        .eq('id', dayId)
+        .eq('mobile_number', mobileNumber);
+
+      const { error } = await query;
 
       if (error) {
         throw error;
@@ -195,11 +217,17 @@ export function useDayManagement() {
   // Delete all days for current account
   const deleteAllDays = async (): Promise<boolean> => {
     try {
+      if (!mobileNumber) return false;
+
+      console.log('Deleting all data for mobile:', mobileNumber);
+
       // First delete all shifts to avoid foreign key issues
-      const { error: shiftsError } = await supabase
+      let shiftsQuery = supabase
         .from('shifts')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all shifts
+        .eq('mobile_number', mobileNumber);
+
+      const { error: shiftsError } = await shiftsQuery;
 
       if (shiftsError) {
         console.error('Error deleting shifts:', shiftsError);
@@ -207,10 +235,12 @@ export function useDayManagement() {
       }
 
       // Then delete all days
-      const { error: daysError } = await supabase
+      let daysQuery = supabase
         .from('days')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all days
+        .eq('mobile_number', mobileNumber);
+
+      const { error: daysError } = await daysQuery;
 
       if (daysError) {
         console.error('Error deleting days:', daysError);
@@ -289,10 +319,12 @@ export function useDayManagement() {
     return (end.getTime() - start.getTime()) / (1000 * 60 * 60);
   };
 
-  // Load days on mount
+  // Load days on mount and when mobileNumber changes
   useEffect(() => {
-    loadDays();
-  }, []);
+    if (mobileNumber) {
+      loadDays();
+    }
+  }, [mobileNumber]);
 
   const dayStats = useMemo(() => calculateDayStats(days), [days]);
 
