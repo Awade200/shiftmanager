@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { DuplicateCheckResult, UpdateChoice, SaveSummary } from '@/types/duplicateHandling';
 import { ShiftFormData } from '@/types/shift';

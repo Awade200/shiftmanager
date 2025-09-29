@@ -1,3 +1,4 @@
+import React from 'react';
 import { WorkloadWarning } from '@/types/duplicateHandling';
 import { ShiftFormData } from '@/types/shift';
 
