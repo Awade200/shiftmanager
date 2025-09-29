@@ -22,6 +22,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DayWithShifts, DayShift } from '@/types/day';
 import { useDayManagement } from '@/hooks/useDayManagement';
 import { useConflictDetection } from '@/hooks/useConflictDetection';
+import { useMobileAuth } from '@/hooks/useMobileAuth';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -37,7 +38,8 @@ export function DayDetailView({ dayDate, onClose, className }: DayDetailViewProp
   const [editedValues, setEditedValues] = useState<Partial<DayShift>>({});
   const [loading, setLoading] = useState(true);
 
-  const { getDayWithShifts, calculateDuration } = useDayManagement();
+  const { user } = useMobileAuth();
+  const { getDayWithShifts, calculateDuration } = useDayManagement(user?.mobile_number);
   const { checkDayConflicts } = useConflictDetection();
   const { toast } = useToast();
 
