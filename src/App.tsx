@@ -15,6 +15,8 @@ import TodaysShifts from "./pages/TodaysShifts";
 import PasteShifts from "./pages/PasteShifts";
 import GroupedShifts from "./pages/GroupedShifts";
 import Analytics from "./pages/Analytics";
+import UploadSession from "./pages/UploadSession";
+import Calendar from "./pages/Calendar";
 
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
@@ -124,10 +126,17 @@ const App = () => (
               </AppLayout>
             </ProtectedRoute>
           } />
-          <Route path="/paste-shifts" element={
+          <Route path="/upload" element={
             <ProtectedRoute>
               <AppLayout>
-                <PasteShifts />
+                <UploadSession />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/calendar" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <Calendar />
               </AppLayout>
             </ProtectedRoute>
           } />
