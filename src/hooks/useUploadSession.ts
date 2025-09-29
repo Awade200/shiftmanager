@@ -124,7 +124,10 @@ export function useUploadSession() {
 
       // Convert groups to ParsedDay objects
       const days: ParsedDay[] = Object.entries(dayGroups).map(([date, shifts]) => {
-        const dayShifts = shifts.map(shift => ({
+        // Sort shifts by start time before creating ParsedDay
+        const sortedShifts = shifts.sort((a, b) => a.startTime.localeCompare(b.startTime));
+        
+        const dayShifts = sortedShifts.map(shift => ({
           id: crypto.randomUUID(),
           start_time: shift.startTime,
           end_time: shift.endTime,
@@ -199,7 +202,11 @@ export function useUploadSession() {
           
           if (action.type === 'replace') {
             if (action.shifts && action.shifts.length > 0) {
-              await replaceDayShifts(dayId, action.shifts.map(shift => ({
+              // Sort shifts by start time before saving
+              const sortedShifts = [...action.shifts].sort((a, b) => 
+                a.start_time.localeCompare(b.start_time)
+              );
+              await replaceDayShifts(dayId, sortedShifts.map(shift => ({
                 date: action.day_date,
                 startTime: shift.start_time,
                 endTime: shift.end_time,
@@ -212,7 +219,11 @@ export function useUploadSession() {
             }
           } else if (action.type === 'merge') {
             if (action.shifts && action.shifts.length > 0) {
-              await addShiftsToDay(dayId, action.shifts.map(shift => ({
+              // Sort shifts by start time before saving
+              const sortedShifts = [...action.shifts].sort((a, b) => 
+                a.start_time.localeCompare(b.start_time)
+              );
+              await addShiftsToDay(dayId, sortedShifts.map(shift => ({
                 date: action.day_date,
                 startTime: shift.start_time,
                 endTime: shift.end_time,

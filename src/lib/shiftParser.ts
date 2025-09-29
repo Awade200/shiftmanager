@@ -268,8 +268,16 @@ export function parseRota(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr' =
     warnings.push(`Many lines could not be parsed (${unknownLines.length}/${lines.length}). Please verify the format.`);
   }
 
+  // Sort shifts chronologically by start time
+  const sortedShifts = shifts.sort((a, b) => {
+    // First sort by date, then by start time
+    const dateCompare = a.date.localeCompare(b.date);
+    if (dateCompare !== 0) return dateCompare;
+    return a.startTime.localeCompare(b.startTime);
+  });
+
   return {
-    shifts,
+    shifts: sortedShifts,
     warnings,
     debugInfo: {
       totalLines: lines.length,

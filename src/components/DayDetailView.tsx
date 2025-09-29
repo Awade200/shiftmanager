@@ -271,7 +271,9 @@ export function DayDetailView({ dayDate, onClose, className }: DayDetailViewProp
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {dayData.shifts.map((shift) => (
+            {[...dayData.shifts]
+              .sort((a, b) => a.start_time.localeCompare(b.start_time))
+              .map((shift) => (
               <div
                 key={shift.id}
                 className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
