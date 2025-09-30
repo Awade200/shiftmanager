@@ -29,14 +29,14 @@ export interface ParseResult {
 
 // Regex patterns for token detection
 const PATTERNS = {
-  day: /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i,
+  day: /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/i,
   date: /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/,
   clientCode: /^CD\d{3,5}\b/i,
   timeRange: /\b(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})\b/,
   hoursQuantity: /(?:Shift|Hours?)\s+([\d.]+)/i,
   trailingFloat: /\b([\d.]{1,5})\s*$/,
   serviceKeywords: /(?:Supported Living|Day Shift|Night Shift|Respite|Personal Care)/i,
-  pageFooter: /^(?:Run Date:|Page|Employee No:|Total|Grand Total)/i,
+  pageFooter: /^(?:Run Date:|Page|Employee No:|Total|Grand Total|Day Client Service Quantity|Employee Timesheet From Date:|Total Sleeps)/i,
   // New pattern for your format: CD code followed by service and hours
   codeServiceHours: /^(CD\d{3,5})\s+(.+?)\s+([\d.]+)$/i
 };
