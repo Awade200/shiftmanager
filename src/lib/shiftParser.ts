@@ -139,166 +139,156 @@ function detectMultiLineFormat(lines: string[]): boolean {
   return hasMultiLineStructure && hasServiceHoursPattern;
 }
 
-// Parse multi-line day-based format
+// Parse multi-line day-based format (two-phase: clients first, then services)
 function parseMultiLineFormat(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr'): ParseResult {
   const lines = preprocessText(rawText);
   const shifts: ShiftRow[] = [];
   const warnings: string[] = [];
   const unknownLines: string[] = [];
   
-  let state: 'WAITING_FOR_DAY' | 'WAITING_FOR_DATE' | 'EXPECTING_CODE' | 'EXPECTING_NAME' | 'EXPECTING_SERVICE' | 'EXPECTING_TIME' = 'WAITING_FOR_DAY';
+  // Phase 1: Extract client information by day
+  interface ClientEntry {
+    day: string;
+    date: string;
+    code: string;
+    name: string;
+  }
   
+  const clients: ClientEntry[] = [];
   let currentDay = '';
   let currentDate = '';
-  let shiftBuffer = {
-    code: '',
-    name: '',
-    service: '',
-    hours: 0,
-    timeRange: ''
-  };
-  let bufferLines: string[] = [];
+  let i = 0;
   
-  function emitShift() {
-    if (!shiftBuffer.code || !shiftBuffer.timeRange) {
-      return; // Invalid shift, skip
+  // Find where service lines start (service lines come after all client info)
+  let serviceStartIndex = -1;
+  for (let idx = 0; idx < lines.length; idx++) {
+    if (PATTERNS.serviceWithHours.test(lines[idx]) && PATTERNS.serviceKeywords.test(lines[idx])) {
+      serviceStartIndex = idx;
+      break;
+    }
+  }
+  
+  if (serviceStartIndex === -1) {
+    warnings.push('Could not find service section in multi-line format');
+    return { shifts: [], warnings, debugInfo: { totalLines: lines.length, processedLines: 0, unknownLines: [], detectedFormat: 'multi-line' } };
+  }
+  
+  // Parse client section (before services start)
+  for (i = 0; i < serviceStartIndex; i++) {
+    const line = lines[i];
+    
+    // Check for day
+    const dayMatch = line.match(PATTERNS.day);
+    if (dayMatch) {
+      currentDay = dayMatch[1];
+      continue;
     }
     
-    const timeMatch = shiftBuffer.timeRange.match(PATTERNS.timeRange);
-    if (!timeMatch) {
-      warnings.push(`Invalid time range: ${shiftBuffer.timeRange}`);
-      return;
+    // Check for date (may include first client name)
+    const dateMatch = line.match(PATTERNS.date);
+    if (dateMatch) {
+      currentDate = dateMatch[0];
+      // Extract potential client name after date
+      const afterDate = line.replace(dateMatch[0], '').trim();
+      if (afterDate && !PATTERNS.clientCode.test(afterDate)) {
+        // This is a client name on the date line - look for preceding code
+        // The code should be on the previous line
+        if (i > 0 && PATTERNS.clientCodeOnly.test(lines[i-1])) {
+          clients.push({
+            day: currentDay,
+            date: currentDate,
+            code: lines[i-1].trim(),
+            name: afterDate
+          });
+        }
+      }
+      continue;
     }
     
-    const [, startTime, endTime] = timeMatch;
-    const normalizedStart = normalizeTime(startTime);
-    const normalizedEnd = normalizeTime(endTime);
-    const computedHours = computeHours(normalizedStart, normalizedEnd);
+    // Check for standalone client code
+    if (PATTERNS.clientCodeOnly.test(line)) {
+      // Next line might be the name (if it's not another code or date)
+      if (i + 1 < serviceStartIndex) {
+        const nextLine = lines[i + 1];
+        if (!PATTERNS.clientCode.test(nextLine) && 
+            !PATTERNS.date.test(nextLine) && 
+            !PATTERNS.day.test(nextLine)) {
+          clients.push({
+            day: currentDay,
+            date: currentDate,
+            code: line.trim(),
+            name: nextLine
+          });
+          i++; // Skip the name line
+          continue;
+        }
+      }
+      // If no name follows, we'll match it later if there's a date line
+      continue;
+    }
+  }
+  
+  // Phase 2: Extract service + time pairs
+  interface ServiceEntry {
+    service: string;
+    hours: number;
+    startTime: string;
+    endTime: string;
+  }
+  
+  const services: ServiceEntry[] = [];
+  
+  for (i = serviceStartIndex; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Check for service with hours
+    const serviceMatch = line.match(PATTERNS.serviceWithHours);
+    if (serviceMatch && PATTERNS.serviceKeywords.test(line)) {
+      const service = serviceMatch[1].trim();
+      const hours = parseFloat(serviceMatch[2]);
+      
+      // Next line should be time range
+      if (i + 1 < lines.length) {
+        const timeLine = lines[i + 1];
+        const timeMatch = timeLine.match(PATTERNS.timeRangeOnly);
+        if (timeMatch) {
+          services.push({
+            service,
+            hours,
+            startTime: normalizeTime(timeMatch[1]),
+            endTime: normalizeTime(timeMatch[2])
+          });
+          i++; // Skip the time line
+        }
+      }
+    }
+  }
+  
+  // Phase 3: Match clients with services (in order)
+  const minLength = Math.min(clients.length, services.length);
+  
+  if (clients.length !== services.length) {
+    warnings.push(`Client count (${clients.length}) doesn't match service count (${services.length}). Some shifts may be incomplete.`);
+  }
+  
+  for (let idx = 0; idx < minLength; idx++) {
+    const client = clients[idx];
+    const service = services[idx];
     
     shifts.push({
-      day: currentDay,
-      date: normalizeDate(currentDate),
-      clientCode: shiftBuffer.code,
-      clientName: shiftBuffer.name || 'Unknown Client',
-      service: shiftBuffer.service || 'Shift',
-      startTime: normalizedStart,
-      endTime: normalizedEnd,
-      hours: shiftBuffer.hours || computedHours,
+      day: client.day,
+      date: normalizeDate(client.date),
+      clientCode: client.code,
+      clientName: client.name || 'Unknown Client',
+      service: service.service,
+      startTime: service.startTime,
+      endTime: service.endTime,
+      hours: service.hours,
       sourceType,
-      rawLines: [...bufferLines],
+      rawLines: [client.day, client.date, client.code, client.name, service.service + ' ' + service.hours, `${service.startTime}-${service.endTime}`],
       hoursCorrected: false,
-      needsLocation: !shiftBuffer.name
+      needsLocation: !client.name
     });
-    
-    // Reset shift buffer but keep day/date
-    shiftBuffer = { code: '', name: '', service: '', hours: 0, timeRange: '' };
-    bufferLines = [];
-    state = 'EXPECTING_CODE';
-  }
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    bufferLines.push(line);
-    let lineProcessed = false;
-    
-    switch (state) {
-      case 'WAITING_FOR_DAY': {
-        const dayMatch = line.match(PATTERNS.day);
-        if (dayMatch) {
-          currentDay = dayMatch[1];
-          state = 'WAITING_FOR_DATE';
-          lineProcessed = true;
-        }
-        break;
-      }
-      
-      case 'WAITING_FOR_DATE': {
-        const dateMatch = line.match(PATTERNS.date);
-        if (dateMatch) {
-          currentDate = dateMatch[0];
-          // First client name might be on this line
-          const afterDate = line.replace(dateMatch[0], '').trim();
-          if (afterDate) {
-            // This is likely the first client name for reference, but each shift has its own
-            // We'll capture actual names per shift
-          }
-          state = 'EXPECTING_CODE';
-          lineProcessed = true;
-        }
-        break;
-      }
-      
-      case 'EXPECTING_CODE': {
-        const codeMatch = line.match(PATTERNS.clientCodeOnly);
-        if (codeMatch) {
-          shiftBuffer.code = line.trim();
-          state = 'EXPECTING_NAME';
-          lineProcessed = true;
-        } else {
-          // Check if we're moving to next day
-          const dayMatch = line.match(PATTERNS.day);
-          if (dayMatch) {
-            currentDay = dayMatch[1];
-            state = 'WAITING_FOR_DATE';
-            lineProcessed = true;
-          }
-        }
-        break;
-      }
-      
-      case 'EXPECTING_NAME': {
-        // Next line should be client name (not a code, date, or service)
-        if (!PATTERNS.clientCode.test(line) && 
-            !PATTERNS.date.test(line) && 
-            !PATTERNS.serviceKeywords.test(line) &&
-            !PATTERNS.timeRange.test(line)) {
-          shiftBuffer.name = line;
-          state = 'EXPECTING_SERVICE';
-          lineProcessed = true;
-        } else {
-          // No name found, use empty and move to service if it's a service line
-          const serviceMatch = line.match(PATTERNS.serviceWithHours);
-          if (serviceMatch && PATTERNS.serviceKeywords.test(line)) {
-            shiftBuffer.name = '';
-            shiftBuffer.service = serviceMatch[1].trim();
-            shiftBuffer.hours = parseFloat(serviceMatch[2]);
-            state = 'EXPECTING_TIME';
-            lineProcessed = true;
-          }
-        }
-        break;
-      }
-      
-      case 'EXPECTING_SERVICE': {
-        const serviceMatch = line.match(PATTERNS.serviceWithHours);
-        if (serviceMatch && PATTERNS.serviceKeywords.test(line)) {
-          shiftBuffer.service = serviceMatch[1].trim();
-          shiftBuffer.hours = parseFloat(serviceMatch[2]);
-          state = 'EXPECTING_TIME';
-          lineProcessed = true;
-        }
-        break;
-      }
-      
-      case 'EXPECTING_TIME': {
-        const timeMatch = line.match(PATTERNS.timeRangeOnly);
-        if (timeMatch) {
-          shiftBuffer.timeRange = line;
-          emitShift();
-          lineProcessed = true;
-        }
-        break;
-      }
-    }
-    
-    if (!lineProcessed && line.length > 2) {
-      unknownLines.push(line);
-    }
-  }
-  
-  // Validate results
-  if (shifts.length === 0) {
-    warnings.push('No shifts detected in multi-line format. Please check the format.');
   }
   
   // Sort shifts chronologically
