@@ -4,7 +4,6 @@ import {
   Home, 
   Plus, 
   Calendar, 
-  Clock, 
   Clipboard, 
   Settings, 
   Users, 
@@ -50,7 +49,6 @@ const navItems: NavItem[] = [
     items: [
       { path: '/calendar', label: 'Calendar View', icon: Calendar },
       { path: '/upload', label: 'Upload Shifts', icon: Plus },
-      { path: '/todays-shifts', label: "Today's Shifts", icon: Clock },
     ]
   },
   { path: '/analytics', label: 'Analytics', icon: BarChart3 },
