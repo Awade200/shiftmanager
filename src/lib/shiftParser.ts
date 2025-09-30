@@ -24,6 +24,7 @@ export interface ParseResult {
     totalLines: number;
     processedLines: number;
     unknownLines: string[];
+    detectedFormat?: 'multi-line' | 'stacked' | 'tabular';
   };
 }
 
@@ -32,8 +33,11 @@ const PATTERNS = {
   day: /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/i,
   date: /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/,
   clientCode: /^CD\d{3,5}\b/i,
+  clientCodeOnly: /^CD\d{3,5}$/i, // Client code on its own line
   timeRange: /\b(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})\b/,
+  timeRangeOnly: /^(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})$/,
   hoursQuantity: /(?:Shift|Hours?)\s+([\d.]+)/i,
+  serviceWithHours: /^(.+?)\s+([\d.]+)$/, // Service description ending with hours
   trailingFloat: /\b([\d.]{1,5})\s*$/,
   serviceKeywords: /(?:Supported Living|Day Shift|Night Shift|Respite|Personal Care)/i,
   pageFooter: /^(?:Run Date:|Page|Employee No:|Total|Grand Total|Day Client Service Quantity|Employee Timesheet From Date:|Total Sleeps)/i,
@@ -104,6 +108,216 @@ function computeHours(startTime: string, endTime: string): number {
   }
   
   return (end - start) / 60;
+}
+
+// Detect multi-line day-based format
+function detectMultiLineFormat(lines: string[]): boolean {
+  let dayCount = 0;
+  let dateCount = 0;
+  let codeOnlyCount = 0;
+  let timeOnlyCount = 0;
+  let serviceWithHoursCount = 0;
+  
+  for (const line of lines) {
+    if (PATTERNS.day.test(line)) dayCount++;
+    if (PATTERNS.date.test(line)) dateCount++;
+    if (PATTERNS.clientCodeOnly.test(line)) codeOnlyCount++;
+    if (PATTERNS.timeRangeOnly.test(line)) timeOnlyCount++;
+    if (PATTERNS.serviceWithHours.test(line) && PATTERNS.serviceKeywords.test(line)) {
+      serviceWithHoursCount++;
+    }
+  }
+  
+  // Multi-line format indicators:
+  // - Has standalone client codes (code on its own line)
+  // - Has standalone time ranges (time on its own line)
+  // - Has service + hours lines
+  // - Ratio of these patterns suggests 4-line shift blocks
+  const hasMultiLineStructure = codeOnlyCount >= 3 && timeOnlyCount >= 3;
+  const hasServiceHoursPattern = serviceWithHoursCount >= 3;
+  
+  return hasMultiLineStructure && hasServiceHoursPattern;
+}
+
+// Parse multi-line day-based format
+function parseMultiLineFormat(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr'): ParseResult {
+  const lines = preprocessText(rawText);
+  const shifts: ShiftRow[] = [];
+  const warnings: string[] = [];
+  const unknownLines: string[] = [];
+  
+  let state: 'WAITING_FOR_DAY' | 'WAITING_FOR_DATE' | 'EXPECTING_CODE' | 'EXPECTING_NAME' | 'EXPECTING_SERVICE' | 'EXPECTING_TIME' = 'WAITING_FOR_DAY';
+  
+  let currentDay = '';
+  let currentDate = '';
+  let shiftBuffer = {
+    code: '',
+    name: '',
+    service: '',
+    hours: 0,
+    timeRange: ''
+  };
+  let bufferLines: string[] = [];
+  
+  function emitShift() {
+    if (!shiftBuffer.code || !shiftBuffer.timeRange) {
+      return; // Invalid shift, skip
+    }
+    
+    const timeMatch = shiftBuffer.timeRange.match(PATTERNS.timeRange);
+    if (!timeMatch) {
+      warnings.push(`Invalid time range: ${shiftBuffer.timeRange}`);
+      return;
+    }
+    
+    const [, startTime, endTime] = timeMatch;
+    const normalizedStart = normalizeTime(startTime);
+    const normalizedEnd = normalizeTime(endTime);
+    const computedHours = computeHours(normalizedStart, normalizedEnd);
+    
+    shifts.push({
+      day: currentDay,
+      date: normalizeDate(currentDate),
+      clientCode: shiftBuffer.code,
+      clientName: shiftBuffer.name || 'Unknown Client',
+      service: shiftBuffer.service || 'Shift',
+      startTime: normalizedStart,
+      endTime: normalizedEnd,
+      hours: shiftBuffer.hours || computedHours,
+      sourceType,
+      rawLines: [...bufferLines],
+      hoursCorrected: false,
+      needsLocation: !shiftBuffer.name
+    });
+    
+    // Reset shift buffer but keep day/date
+    shiftBuffer = { code: '', name: '', service: '', hours: 0, timeRange: '' };
+    bufferLines = [];
+    state = 'EXPECTING_CODE';
+  }
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    bufferLines.push(line);
+    let lineProcessed = false;
+    
+    switch (state) {
+      case 'WAITING_FOR_DAY': {
+        const dayMatch = line.match(PATTERNS.day);
+        if (dayMatch) {
+          currentDay = dayMatch[1];
+          state = 'WAITING_FOR_DATE';
+          lineProcessed = true;
+        }
+        break;
+      }
+      
+      case 'WAITING_FOR_DATE': {
+        const dateMatch = line.match(PATTERNS.date);
+        if (dateMatch) {
+          currentDate = dateMatch[0];
+          // First client name might be on this line
+          const afterDate = line.replace(dateMatch[0], '').trim();
+          if (afterDate) {
+            // This is likely the first client name for reference, but each shift has its own
+            // We'll capture actual names per shift
+          }
+          state = 'EXPECTING_CODE';
+          lineProcessed = true;
+        }
+        break;
+      }
+      
+      case 'EXPECTING_CODE': {
+        const codeMatch = line.match(PATTERNS.clientCodeOnly);
+        if (codeMatch) {
+          shiftBuffer.code = line.trim();
+          state = 'EXPECTING_NAME';
+          lineProcessed = true;
+        } else {
+          // Check if we're moving to next day
+          const dayMatch = line.match(PATTERNS.day);
+          if (dayMatch) {
+            currentDay = dayMatch[1];
+            state = 'WAITING_FOR_DATE';
+            lineProcessed = true;
+          }
+        }
+        break;
+      }
+      
+      case 'EXPECTING_NAME': {
+        // Next line should be client name (not a code, date, or service)
+        if (!PATTERNS.clientCode.test(line) && 
+            !PATTERNS.date.test(line) && 
+            !PATTERNS.serviceKeywords.test(line) &&
+            !PATTERNS.timeRange.test(line)) {
+          shiftBuffer.name = line;
+          state = 'EXPECTING_SERVICE';
+          lineProcessed = true;
+        } else {
+          // No name found, use empty and move to service if it's a service line
+          const serviceMatch = line.match(PATTERNS.serviceWithHours);
+          if (serviceMatch && PATTERNS.serviceKeywords.test(line)) {
+            shiftBuffer.name = '';
+            shiftBuffer.service = serviceMatch[1].trim();
+            shiftBuffer.hours = parseFloat(serviceMatch[2]);
+            state = 'EXPECTING_TIME';
+            lineProcessed = true;
+          }
+        }
+        break;
+      }
+      
+      case 'EXPECTING_SERVICE': {
+        const serviceMatch = line.match(PATTERNS.serviceWithHours);
+        if (serviceMatch && PATTERNS.serviceKeywords.test(line)) {
+          shiftBuffer.service = serviceMatch[1].trim();
+          shiftBuffer.hours = parseFloat(serviceMatch[2]);
+          state = 'EXPECTING_TIME';
+          lineProcessed = true;
+        }
+        break;
+      }
+      
+      case 'EXPECTING_TIME': {
+        const timeMatch = line.match(PATTERNS.timeRangeOnly);
+        if (timeMatch) {
+          shiftBuffer.timeRange = line;
+          emitShift();
+          lineProcessed = true;
+        }
+        break;
+      }
+    }
+    
+    if (!lineProcessed && line.length > 2) {
+      unknownLines.push(line);
+    }
+  }
+  
+  // Validate results
+  if (shifts.length === 0) {
+    warnings.push('No shifts detected in multi-line format. Please check the format.');
+  }
+  
+  // Sort shifts chronologically
+  const sortedShifts = shifts.sort((a, b) => {
+    const dateCompare = a.date.localeCompare(b.date);
+    if (dateCompare !== 0) return dateCompare;
+    return a.startTime.localeCompare(b.startTime);
+  });
+  
+  return {
+    shifts: sortedShifts,
+    warnings,
+    debugInfo: {
+      totalLines: lines.length,
+      processedLines: lines.length - unknownLines.length,
+      unknownLines: unknownLines.slice(0, 10),
+      detectedFormat: 'multi-line'
+    }
+  };
 }
 
 // Main parsing function with stateful model
@@ -282,7 +496,8 @@ export function parseRota(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr' =
     debugInfo: {
       totalLines: lines.length,
       processedLines: lines.length - unknownLines.length,
-      unknownLines: unknownLines.slice(0, 5) // Show first 5 for debugging
+      unknownLines: unknownLines.slice(0, 5), // Show first 5 for debugging
+      detectedFormat: 'stacked'
     }
   };
 }
@@ -292,6 +507,13 @@ export function extractShiftsAuto(rawText: string, sourceType: 'paste' | 'pdf' |
   // Simple heuristics to detect format
   const lines = preprocessText(rawText);
   
+  // Check for multi-line format first (most specific)
+  const isMultiLine = detectMultiLineFormat(lines);
+  if (isMultiLine) {
+    console.log('✅ Detected multi-line day-based format (4-line shift blocks)');
+    return parseMultiLineFormat(rawText, sourceType);
+  }
+  
   // Count indicators of different formats
   const codeCount = lines.filter(line => PATTERNS.clientCode.test(line)).length;
   const dayCount = lines.filter(line => PATTERNS.day.test(line)).length;
@@ -300,13 +522,17 @@ export function extractShiftsAuto(rawText: string, sourceType: 'paste' | 'pdf' |
   // If we have many CD codes and service lines, likely stacked format
   if (codeCount > 0 && serviceCount > 0) {
     console.log('Detected stacked format (codes + services)');
-    return parseRota(rawText, sourceType);
+    const result = parseRota(rawText, sourceType);
+    result.debugInfo.detectedFormat = 'stacked';
+    return result;
   }
   
   // If we have day headers, likely week-based format
   if (dayCount > 1) {
     console.log('Detected day-based format');
-    return parseRota(rawText, sourceType);
+    const result = parseRota(rawText, sourceType);
+    result.debugInfo.detectedFormat = 'stacked';
+    return result;
   }
   
   // Check for CSV-like format (commas or tabs)
@@ -316,12 +542,16 @@ export function extractShiftsAuto(rawText: string, sourceType: 'paste' | 'pdf' |
     const processedText = rawText
       .replace(/[,\t]/g, '\n')
       .replace(/\n+/g, '\n');
-    return parseRota(processedText, sourceType);
+    const result = parseRota(processedText, sourceType);
+    result.debugInfo.detectedFormat = 'tabular';
+    return result;
   }
   
   // Default to stacked parser
   console.log('Using default stacked parser');
-  return parseRota(rawText, sourceType);
+  const result = parseRota(rawText, sourceType);
+  result.debugInfo.detectedFormat = 'stacked';
+  return result;
 }
 
 // Convert ShiftRow to OCRResult for compatibility with existing code
