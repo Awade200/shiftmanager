@@ -45,7 +45,7 @@ const TodaysShifts = () => {
     try {
       return format(new Date(`2000-01-01T${time}`), 'HH:mm');
     } catch {
-      return time;
+      return '—';
     }
   };
 
@@ -125,7 +125,7 @@ const TodaysShifts = () => {
                         {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {shift.duration.toFixed(1)} hours
+                        {Number(shift.duration || 0).toFixed(1)} hours
                       </div>
                     </div>
                   </div>
@@ -134,10 +134,10 @@ const TodaysShifts = () => {
                     <DollarSign className="w-4 h-4 text-primary" />
                     <div className="text-center sm:text-right">
                       <div className="font-semibold text-foreground">
-                        £{shift.earnings.toFixed(2)}
+                        £{Number(shift.earnings || 0).toFixed(2)}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        £{shift.hourly_rate.toFixed(2)}/hr
+                        £{Number(shift.hourly_rate || 0).toFixed(2)}/hr
                       </div>
                     </div>
                   </div>
@@ -161,14 +161,14 @@ const TodaysShifts = () => {
             <div className="flex gap-6">
               <div className="text-center">
                 <div className="font-bold text-xl text-foreground">
-                  {todaysShifts.reduce((sum, shift) => sum + shift.duration, 0).toFixed(1)}
+                  {todaysShifts.reduce((sum, shift) => sum + Number(shift.duration || 0), 0).toFixed(1)}
                 </div>
                 <div className="text-sm text-muted-foreground">Hours</div>
               </div>
               
               <div className="text-center">
                 <div className="font-bold text-xl text-foreground">
-                  £{todaysShifts.reduce((sum, shift) => sum + shift.earnings, 0).toFixed(2)}
+                  £{todaysShifts.reduce((sum, shift) => sum + Number(shift.earnings || 0), 0).toFixed(2)}
                 </div>
                 <div className="text-sm text-muted-foreground">Earnings</div>
               </div>

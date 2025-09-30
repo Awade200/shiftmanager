@@ -92,6 +92,9 @@ export function useDayManagement(mobileNumber?: string) {
         ...dayData,
         shifts: (shiftsData || []).map(shift => ({
           ...shift,
+          duration: Number(shift.duration) || 0,
+          earnings: Number(shift.earnings) || 0,
+          hourly_rate: Number(shift.hourly_rate) || 0,
           status: shift.status as 'ready' | 'unresolved' | 'error' | 'conflict'
         }))
       };
