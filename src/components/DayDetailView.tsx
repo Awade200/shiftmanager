@@ -48,6 +48,23 @@ export function DayDetailView({ dayDate, onClose, className }: DayDetailViewProp
     return timeString.substring(0, 5);
   };
 
+  // Generate consistent color for each client
+  const getClientColor = (clientName: string): string => {
+    // Simple hash function to convert client name to a number
+    let hash = 0;
+    for (let i = 0; i < clientName.length; i++) {
+      hash = clientName.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    // Color palette with distinct, professional hues (avoiding reds to prevent confusion with conflicts)
+    const hues = [200, 280, 160, 45, 300, 180, 100, 260, 30, 340];
+    const hueIndex = Math.abs(hash) % hues.length;
+    const hue = hues[hueIndex];
+    
+    // Return HSL color with good saturation and lightness for visibility
+    return `hsl(${hue}, 65%, 55%)`;
+  };
+
   useEffect(() => {
     if (!authLoading && user?.mobile_number) {
       loadDayData();
@@ -196,17 +213,19 @@ export function DayDetailView({ dayDate, onClose, className }: DayDetailViewProp
               
               const width = endPercent - startPercent;
               
+              const clientColor = getClientColor(shift.client_name);
+              
               return (
                 <div
                   key={shift.id}
                   className={cn(
                     "absolute top-0 h-full rounded flex items-center justify-center text-xs font-medium text-white",
-                    shift.status === 'conflict' ? 'bg-destructive' : 'bg-primary',
                     width < 10 && 'px-1'
                   )}
                   style={{
                     left: `${startPercent}%`,
-                    width: `${width}%`
+                    width: `${width}%`,
+                    backgroundColor: shift.status === 'conflict' ? 'hsl(var(--destructive))' : clientColor
                   }}
                   title={`${shift.client_name}: ${shift.start_time} - ${shift.end_time}`}
                 >
@@ -216,6 +235,19 @@ export function DayDetailView({ dayDate, onClose, className }: DayDetailViewProp
                 </div>
               );
             })}
+          </div>
+          
+          {/* Client Legend */}
+          <div className="mt-4 flex flex-wrap gap-3">
+            {Array.from(new Set(sortedShifts.map(s => s.client_name))).map(clientName => (
+              <div key={clientName} className="flex items-center gap-2">
+                <div 
+                  className="w-3 h-3 rounded-sm" 
+                  style={{ backgroundColor: getClientColor(clientName) }}
+                />
+                <span className="text-xs text-muted-foreground">{clientName}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
