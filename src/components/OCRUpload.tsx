@@ -53,9 +53,14 @@ const OCRUpload = () => {
     }
 
     try {
-      const results = await extractShiftsFromImage(file);
+      // Extract raw text from image/PDF
+      const rawText = await extractShiftsFromImage(file);
       
-      if (results.length === 0) {
+      // Parse with extractShiftsAuto from shiftParser
+      const { extractShiftsAuto } = await import('@/lib/shiftParser');
+      const parseResult = extractShiftsAuto(rawText, file.type === 'application/pdf' ? 'pdf' : 'ocr');
+      
+      if (parseResult.shifts.length === 0) {
         toast({
           title: "No shifts found",
           description: "Could not extract shift data from the image. Try manual entry instead.",
@@ -63,6 +68,17 @@ const OCRUpload = () => {
         });
         return;
       }
+
+      // Convert ShiftRow to OCRResult format for this component
+      const results = parseResult.shifts.map(shift => ({
+        date: shift.date,
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        clientName: shift.clientName,
+        location: shift.service || '',
+        serviceType: shift.service || '',
+        duration: shift.hours
+      }));
 
       // Add default values and check for existing client locations
       const shiftsWithDefaults = results.map(shift => {
@@ -88,7 +104,7 @@ const OCRUpload = () => {
         variant: "destructive",
       });
     }
-  }, [extractShiftsFromImage, settings.defaultHourlyRate, toast]);
+  }, [extractShiftsFromImage, settings.defaultHourlyRate, toast, findClientLocation]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();

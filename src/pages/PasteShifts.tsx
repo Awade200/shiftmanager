@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { SmartShiftUpload } from '@/components/SmartShiftUpload';
 import { ShiftPreview } from '@/components/ShiftPreview';
-import { ShiftRow } from '@/lib/shiftParser';
+import { ShiftRow, extractShiftsAuto } from '@/lib/shiftParser';
 import { ShiftFormData } from '@/types/shift';
 import { useShifts } from '@/hooks/useShifts';
 import { useToast } from '@/hooks/use-toast';
@@ -13,9 +13,11 @@ export default function PasteShifts() {
   const { addMultipleShifts } = useShifts();
   const { toast } = useToast();
 
-  const handleShiftsExtracted = (shifts: ShiftRow[], extractionWarnings: string[]) => {
-    setExtractedShifts(shifts);
-    setWarnings(extractionWarnings);
+  const handleTextExtracted = (rawText: string, extractionWarnings: string[]) => {
+    // Parse the raw text to get ShiftRow[]
+    const result = extractShiftsAuto(rawText, 'paste');
+    setExtractedShifts(result.shifts);
+    setWarnings([...extractionWarnings, ...result.warnings]);
   };
 
   const handleShiftsUpdated = (shifts: ShiftRow[]) => {
@@ -52,7 +54,7 @@ export default function PasteShifts() {
         </p>
       </div>
 
-      <SmartShiftUpload onShiftsExtracted={handleShiftsExtracted} />
+      <SmartShiftUpload onTextExtracted={handleTextExtracted} />
       
       {extractedShifts.length > 0 && (
         <ShiftPreview 

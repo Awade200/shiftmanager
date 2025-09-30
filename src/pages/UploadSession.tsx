@@ -14,7 +14,6 @@ import { DayCard } from '@/components/DayCard';
 import { UnresolvedShifts } from '@/components/UnresolvedShifts';
 import { ParsedDay, DayAction } from '@/types/day';
 import { SmartShiftUpload } from '@/components/SmartShiftUpload';
-import { ShiftRow } from '@/lib/shiftParser';
 
 export default function UploadSession() {
   const [uploadText, setUploadText] = useState('');
@@ -103,27 +102,20 @@ export default function UploadSession() {
     }
   };
 
-  const handleShiftsExtracted = async (shifts: ShiftRow[], warnings: string[]) => {
-    if (!currentSession) return;
+  const handleTextExtracted = async (rawText: string, warnings: string[]) => {
+    if (!currentSession) {
+      toast({
+        title: "Session not initialized",
+        description: "Please refresh the page and try again",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
       setIsUploading(true);
       
-      // Convert ShiftRow[] to raw text format that parseUploadedData expects
-      const textLines: string[] = [];
-      shifts.forEach(shift => {
-        const parts: string[] = [];
-        if (shift.day) parts.push(shift.day);
-        if (shift.date) parts.push(shift.date);
-        if (shift.clientCode) parts.push(shift.clientCode);
-        if (shift.clientName) parts.push(shift.clientName);
-        if (shift.startTime && shift.endTime) parts.push(`${shift.startTime}-${shift.endTime}`);
-        if (shift.service) parts.push(shift.service);
-        if (shift.hours) parts.push(`${shift.hours}h`);
-        textLines.push(parts.join(' '));
-      });
-      
-      const rawText = textLines.join('\n');
+      // Pass raw text directly to parseUploadedData
       await parseUploadedData(rawText, mobileNumber, currentSession.id);
       
       // Initialize default actions (merge)
@@ -280,7 +272,7 @@ export default function UploadSession() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <SmartShiftUpload onShiftsExtracted={handleShiftsExtracted} />
+            <SmartShiftUpload onTextExtracted={handleTextExtracted} />
           </CardContent>
         </Card>
       )}

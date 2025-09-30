@@ -10,7 +10,7 @@ export const useOCR = () => {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  const extractShiftsFromImage = async (file: File): Promise<OCRResult[]> => {
+  const extractShiftsFromImage = async (file: File): Promise<string> => {
     setLoading(true);
     setProgress(0);
 
@@ -24,7 +24,7 @@ export const useOCR = () => {
         const loadingTask = pdfjsLib.getDocument(arrayBuffer);
         const pdf = await loadingTask.promise;
         
-        let text = '';
+        text = '';
         const numPages = pdf.numPages;
         
         for (let pageNum = 1; pageNum <= numPages; pageNum++) {
@@ -50,13 +50,8 @@ export const useOCR = () => {
         console.log('OCR text extracted:', text);
       }
       
-      // Try rota format first, then fall back to legacy format
-      let shifts = parseRotaText(text);
-      if (shifts.length === 0) {
-        shifts = parseShiftText(text);
-      }
-      
-      return shifts;
+      // Return raw text - let the main parser handle format detection
+      return text;
     } catch (error) {
       console.error('Extraction Error:', error);
       throw new Error('Failed to extract text from file');

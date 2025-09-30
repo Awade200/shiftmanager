@@ -10,10 +10,10 @@ import { useOCR } from '@/hooks/useOCR';
 import { useToast } from '@/hooks/use-toast';
 
 interface SmartShiftUploadProps {
-  onShiftsExtracted: (shifts: ShiftRow[], warnings: string[]) => void;
+  onTextExtracted: (rawText: string, warnings: string[]) => void;
 }
 
-export function SmartShiftUpload({ onShiftsExtracted }: SmartShiftUploadProps) {
+export function SmartShiftUpload({ onTextExtracted }: SmartShiftUploadProps) {
   const [inputText, setInputText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastResult, setLastResult] = useState<ParseResult | null>(null);
@@ -45,7 +45,7 @@ export function SmartShiftUpload({ onShiftsExtracted }: SmartShiftUploadProps) {
           variant: "destructive"
         });
       } else {
-        onShiftsExtracted(result.shifts, result.warnings);
+        onTextExtracted(inputText, result.warnings);
         toast({
           title: "Shifts extracted",
           description: `Found ${result.shifts.length} shifts`,
@@ -78,19 +78,12 @@ export function SmartShiftUpload({ onShiftsExtracted }: SmartShiftUploadProps) {
 
     setIsProcessing(true);
     try {
-      // Extract text from PDF using OCR hook (it handles PDFs too)
-      const ocrResults = await extractShiftsFromImage(file);
-      
-      // Convert OCR results to text for our parser
-      let extractedText = '';
-      for (const result of ocrResults) {
-        extractedText += `${result.date} ${result.clientName}\n`;
-        if (result.serviceType) extractedText += `${result.serviceType}\n`;
-        extractedText += `${result.startTime}-${result.endTime}\n\n`;
-      }
+      // Extract raw text from PDF
+      const rawText = await extractShiftsFromImage(file);
+      console.log('PDF raw text extracted:', rawText);
 
       // Parse with our smart engine
-      const result = extractShiftsAuto(extractedText, 'pdf');
+      const result = extractShiftsAuto(rawText, 'pdf');
       setLastResult(result);
       
       if (result.shifts.length === 0) {
@@ -100,7 +93,7 @@ export function SmartShiftUpload({ onShiftsExtracted }: SmartShiftUploadProps) {
           variant: "destructive"
         });
       } else {
-        onShiftsExtracted(result.shifts, result.warnings);
+        onTextExtracted(rawText, result.warnings);
         toast({
           title: "PDF processed",
           description: `Extracted ${result.shifts.length} shifts from PDF`,
@@ -135,19 +128,12 @@ export function SmartShiftUpload({ onShiftsExtracted }: SmartShiftUploadProps) {
     }
 
     try {
-      // Use OCR to extract text from image
-      const ocrResults = await extractShiftsFromImage(file);
-      
-      // Convert OCR results to text for our parser
-      let extractedText = '';
-      for (const result of ocrResults) {
-        extractedText += `${result.date} ${result.clientName}\n`;
-        if (result.serviceType) extractedText += `${result.serviceType}\n`;
-        extractedText += `${result.startTime}-${result.endTime}\n\n`;
-      }
+      // Use OCR to extract raw text from image
+      const rawText = await extractShiftsFromImage(file);
+      console.log('Image raw text extracted:', rawText);
 
       // Parse with our smart engine
-      const result = extractShiftsAuto(extractedText, 'ocr');
+      const result = extractShiftsAuto(rawText, 'ocr');
       setLastResult(result);
       
       if (result.shifts.length === 0) {
@@ -157,7 +143,7 @@ export function SmartShiftUpload({ onShiftsExtracted }: SmartShiftUploadProps) {
           variant: "destructive"
         });
       } else {
-        onShiftsExtracted(result.shifts, result.warnings);
+        onTextExtracted(rawText, result.warnings);
         toast({
           title: "Image processed",
           description: `Extracted ${result.shifts.length} shifts from image using OCR`,
