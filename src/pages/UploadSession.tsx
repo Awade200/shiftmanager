@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { DayCard } from '@/components/DayCard';
 import { UnresolvedShifts } from '@/components/UnresolvedShifts';
 import { ParsedDay, DayAction } from '@/types/day';
+import { SmartShiftUpload } from '@/components/SmartShiftUpload';
+import { ShiftRow } from '@/lib/shiftParser';
 
 export default function UploadSession() {
   const [uploadText, setUploadText] = useState('');
@@ -94,6 +96,52 @@ export default function UploadSession() {
       toast({
         title: "Upload failed",
         description: err instanceof Error ? err.message : "Failed to parse uploaded data",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleShiftsExtracted = async (shifts: ShiftRow[], warnings: string[]) => {
+    if (!currentSession) return;
+    
+    try {
+      setIsUploading(true);
+      
+      // Convert ShiftRow[] to raw text format that parseUploadedData expects
+      const textLines: string[] = [];
+      shifts.forEach(shift => {
+        const parts: string[] = [];
+        if (shift.day) parts.push(shift.day);
+        if (shift.date) parts.push(shift.date);
+        if (shift.clientCode) parts.push(shift.clientCode);
+        if (shift.clientName) parts.push(shift.clientName);
+        if (shift.startTime && shift.endTime) parts.push(`${shift.startTime}-${shift.endTime}`);
+        if (shift.service) parts.push(shift.service);
+        if (shift.hours) parts.push(`${shift.hours}h`);
+        textLines.push(parts.join(' '));
+      });
+      
+      const rawText = textLines.join('\n');
+      await parseUploadedData(rawText, mobileNumber, currentSession.id);
+      
+      // Initialize default actions (merge)
+      const defaultActions: Record<string, DayAction['type']> = {};
+      parsedDays.forEach(day => {
+        defaultActions[day.date] = 'merge';
+      });
+      setSelectedActions(defaultActions);
+      
+      const warningMsg = warnings.length > 0 ? ` (${warnings.length} warnings)` : '';
+      toast({
+        title: "Upload successful",
+        description: `Found ${parsedDays.length} days with shifts${warningMsg}`
+      });
+    } catch (err) {
+      toast({
+        title: "Upload failed",
+        description: err instanceof Error ? err.message : "Failed to process uploaded data",
         variant: "destructive"
       });
     } finally {
@@ -231,32 +279,8 @@ export default function UploadSession() {
               Upload Rota Data
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Textarea
-                placeholder="Paste your rota text here..."
-                value={uploadText}
-                onChange={(e) => setUploadText(e.target.value)}
-                rows={8}
-                className="font-mono text-sm"
-              />
-            </div>
-            
-            <div className="flex gap-2">
-              <Button 
-                onClick={handleTextUpload}
-                disabled={!uploadText.trim() || isUploading || isProcessing}
-                className="flex-1"
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                {isUploading || isProcessing ? 'Processing...' : 'Parse Text'}
-              </Button>
-              
-              <Button variant="outline" disabled>
-                <Camera className="h-4 w-4 mr-2" />
-                Scan Image
-              </Button>
-            </div>
+          <CardContent>
+            <SmartShiftUpload onShiftsExtracted={handleShiftsExtracted} />
           </CardContent>
         </Card>
       )}
