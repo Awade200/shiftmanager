@@ -1,209 +1,97 @@
-import { useDayManagement } from '@/hooks/useDayManagement';
-import { useMobileAuth } from '@/hooks/useMobileAuth';
-import StatsCard from '@/components/StatsCard';
-import CalendarWidget from '@/components/CalendarWidget';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Link } from 'react-router-dom';
-import { Clock, DollarSign, CheckCircle, AlertCircle, Plus, Download, Calendar, Wallet } from 'lucide-react';
 import { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { useMobileAuth } from '@/hooks/useMobileAuth';
+import { useRealtimeShifts } from '@/hooks/useRealtimeShifts';
+import { CompactKPIs } from '@/components/dashboard/CompactKPIs';
+import { TodayShiftView } from '@/components/dashboard/TodayShiftView';
+import { WeekTilesView } from '@/components/dashboard/WeekTilesView';
+import { QueuePanel } from '@/components/dashboard/QueuePanel';
+import { addWeeks, subWeeks } from 'date-fns';
 
 const Dashboard = () => {
   const { user } = useMobileAuth();
-  const { dayStats, days, deleteAllDays } = useDayManagement(user?.mobile_number);
-  const [newHourlyRate, setNewHourlyRate] = useState('15.00');
-  const { toast } = useToast();
-  
-  // Calculate stats from day data
-  const stats = {
-    totalHours: dayStats.total_hours,
-    totalEarnings: dayStats.total_earnings,
-    totalShifts: days.reduce((sum, day) => sum + day.shift_count, 0),
-    paidEarnings: 0, // TODO: Implement paid tracking in day structure
-    unpaidEarnings: dayStats.total_earnings,
-    paidShifts: 0,
-    unpaidShifts: days.reduce((sum, day) => sum + day.shift_count, 0)
-  };
+  const [activeDate, setActiveDate] = useState(new Date());
+  const [centerDate, setCenterDate] = useState(new Date());
 
-  const handleUpdateHourlyRate = async () => {
-    const rate = parseFloat(newHourlyRate);
-    if (rate > 0) {
-      toast({
-        title: "Hourly rate updated",
-        description: `Default hourly rate set to £${rate.toFixed(2)} for future shifts`,
-      });
+  const {
+    weekDays,
+    todayStats,
+    weekStats,
+    conflicts,
+    unresolved,
+    shifts,
+    loading
+  } = useRealtimeShifts(user?.mobile_number, centerDate);
+
+  const handleNavigateWeek = (direction: 'prev' | 'next') => {
+    if (direction === 'prev') {
+      setCenterDate(prev => subWeeks(prev, 1));
+      setActiveDate(prev => subWeeks(prev, 1));
+    } else {
+      setCenterDate(prev => addWeeks(prev, 1));
+      setActiveDate(prev => addWeeks(prev, 1));
     }
   };
 
-  const handleUpdateAllShiftsRate = async () => {
-    const rate = parseFloat(newHourlyRate);
-    if (rate > 0) {
-      toast({
-        title: "Feature coming soon",
-        description: "Bulk rate update will be available soon in the new day management system",
-        variant: "default",
-      });
-    }
-  };
+  const activeDay = weekDays.find(d => d.date === activeDate.toISOString().split('T')[0]);
 
-  const handleExportCSV = () => {
-    try {
-      // Create CSV content from days data
-      const csvHeaders = ['Date', 'Total Hours', 'Shift Count', 'Has Conflicts', 'Has Unresolved'];
-      const csvRows = days.map(day => [
-        day.day_date,
-        day.total_hours.toString(),
-        day.shift_count.toString(),
-        day.has_conflicts ? 'Yes' : 'No',
-        day.has_unresolved ? 'Yes' : 'No'
-      ]);
-      
-      const csvContent = [csvHeaders, ...csvRows]
-        .map(row => row.map(field => `"${field}"`).join(','))
-        .join('\n');
-      
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `days-export-${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      toast({
-        title: "Export successful",
-        description: "Your day data has been exported to CSV",
-      });
-    } catch (error) {
-      toast({
-        title: "Export failed",
-        description: "There was an error exporting your data",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDeleteAllData = async () => {
-    if (window.confirm('Are you sure you want to delete ALL shifts and days? This action cannot be undone.')) {
-      try {
-        const success = await deleteAllDays();
-        if (success) {
-          toast({
-            title: "All data deleted",
-            description: "All shifts and days have been permanently deleted",
-          });
-        } else {
-          toast({
-            title: "Delete failed",
-            description: "Could not delete all data. Please try again.",
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        toast({
-          title: "Delete failed",
-          description: "Could not delete all data. Please try again.",
-          variant: "destructive",
-        });
-      }
-    }
-  };
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto p-4">
+        <div className="text-center py-12 text-muted-foreground">
+          Loading your shifts...
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-6xl mx-auto p-4 space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Track your work shifts and earnings</p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={handleExportCSV} variant="outline" size="sm">
-            <Download className="w-4 h-4 mr-2" />
-            Export CSV
-          </Button>
-          <Button onClick={handleDeleteAllData} variant="destructive" size="sm">
-            Delete All Data
-          </Button>
-          <Button asChild variant="default">
-            <Link to="/upload">
-              <Plus className="w-4 h-4 mr-2" />
-              Upload Shifts
-            </Link>
-          </Button>
-        </div>
+    <div className="max-w-7xl mx-auto p-4 space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+        <p className="text-muted-foreground mt-1">Real-time shift tracking and management</p>
       </div>
 
-      {/* Calendar Widget - Always at the top */}
-      <CalendarWidget />
+      {/* Compact KPIs */}
+      <CompactKPIs
+        todayHours={todayStats.hours}
+        weekHours={weekStats.hours}
+        weekShifts={weekStats.shiftCount}
+        conflictCount={weekStats.conflictCount}
+      />
 
-      {/* Essential Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard
-          title="Total Hours"
-          value={stats.totalHours.toFixed(1)}
-          subtitle={`${stats.totalShifts} shifts recorded`}
-          icon={<Clock className="w-4 h-4" />}
-        />
-        <StatsCard
-          title="Total Earnings"
-          value={`£${stats.totalEarnings.toFixed(2)}`}
-          subtitle="Gross earnings"
-          icon={<DollarSign className="w-4 h-4" />}
-          variant="success"
-        />
-        <StatsCard
-          title="Paid"
-          value={`£${stats.paidEarnings.toFixed(2)}`}
-          subtitle={`${stats.paidShifts} shifts paid`}
-          icon={<CheckCircle className="w-4 h-4" />}
-          variant="success"
-        />
-        <StatsCard
-          title="Unpaid"
-          value={`£${stats.unpaidEarnings.toFixed(2)}`}
-          subtitle={`${stats.unpaidShifts} shifts pending`}
-          icon={<AlertCircle className="w-4 h-4" />}
-          variant="warning"
-        />
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Today's View + Week Tiles */}
+        <div className="lg:col-span-2 space-y-6">
+          <TodayShiftView
+            date={activeDate}
+            shifts={activeDay?.shifts || []}
+            stats={{
+              hours: activeDay?.hours || 0,
+              shiftCount: activeDay?.shiftCount || 0,
+              earnings: activeDay?.shifts.reduce((sum, s) => sum + s.earnings, 0) || 0,
+              hasConflicts: activeDay?.hasConflicts || false
+            }}
+          />
+
+          <WeekTilesView
+            weekDays={weekDays}
+            activeDate={activeDate}
+            onSelectDate={setActiveDate}
+            onNavigateWeek={handleNavigateWeek}
+          />
+        </div>
+
+        {/* Right Column: Queue Panel */}
+        <div className="lg:col-span-1">
+          <QueuePanel
+            conflicts={conflicts}
+            unresolved={unresolved}
+            allShifts={shifts}
+          />
+        </div>
       </div>
-
-      {/* Compact Settings */}
-      <Card className="shadow-card">
-        <CardContent className="p-4">
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-4 items-end">
-              <div className="flex-1">
-                <Label htmlFor="hourlyRate" className="text-sm font-medium">Default Hourly Rate (£)</Label>
-                <Input
-                  id="hourlyRate"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={newHourlyRate}
-                  onChange={(e) => setNewHourlyRate(e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={handleUpdateHourlyRate} variant="outline" size="sm">
-                  Set for Future
-                </Button>
-                <Button onClick={handleUpdateAllShiftsRate} variant="default" size="sm">
-                  Update All Shifts
-                </Button>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              "Set for Future" applies the rate to new shifts only. "Update All Shifts" changes all existing and future shifts to this rate.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };
