@@ -317,8 +317,8 @@ export function DayDetailView({ dayDate, onClose, className }: DayDetailViewProp
         </Button>
       </div>
 
-      {/* Timeline - Hidden on mobile */}
-      <Card className="hidden md:block">
+      {/* Daily Timeline */}
+      <Card>
         <CardHeader>
           <CardTitle>Daily Timeline</CardTitle>
         </CardHeader>
