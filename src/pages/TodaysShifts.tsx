@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useState } from 'react';
 import { useDayManagement } from '@/hooks/useDayManagement';
+import { useMobileAuth } from '@/hooks/useMobileAuth';
 import { DayShift } from '@/types/day';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +8,8 @@ import { Clock, MapPin, User, DollarSign } from 'lucide-react';
 import { format, isToday, parseISO } from 'date-fns';
 
 const TodaysShifts = () => {
-  const { getDayWithShifts } = useDayManagement();
+  const { user } = useMobileAuth();
+  const { getDayWithShifts } = useDayManagement(user?.mobile_number);
   const [todaysShifts, setTodaysShifts] = useState<DayShift[]>([]);
   const [loading, setLoading] = useState(true);
 
