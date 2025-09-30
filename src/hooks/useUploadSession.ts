@@ -204,67 +204,62 @@ export function useUploadSession(mobileNumber?: string) {
       let skippedCount = 0;
       const errors: string[] = [];
 
+      console.log(`\n📋 Processing ${actions.length} day actions:`, {
+        actions: actions.map(a => ({ date: a.day_date, type: a.type, shifts: a.shifts?.length || 0 }))
+      });
+
       for (const action of actions) {
         try {
+          console.log(`\n--- Processing ${action.type.toUpperCase()} for ${action.day_date} ---`);
+          
           if (action.type === 'skip') {
+            console.log(`⏭️  Skipping day ${action.day_date}`);
+            skippedCount++;
+            continue;
+          }
+
+          if (!action.shifts || action.shifts.length === 0) {
+            console.log(`⚠️  No valid shifts for ${action.day_date}, skipping`);
             skippedCount++;
             continue;
           }
 
           const dayId = await getOrCreateDay(action.day_date, mobileNumber);
+          console.log(`📅 Day ID: ${dayId}`);
           
+          // Sort shifts by start time before saving
+          const sortedShifts = [...action.shifts].sort((a, b) => 
+            a.start_time.localeCompare(b.start_time)
+          );
+
+          const shiftsToSave = sortedShifts.map(shift => ({
+            date: action.day_date,
+            startTime: shift.start_time,
+            endTime: shift.end_time,
+            clientName: shift.client_name,
+            location: shift.location,
+            hourlyRate: shift.hourly_rate || 25,
+            isPaid: shift.is_paid || false
+          }));
+
           if (action.type === 'replace') {
-            if (action.shifts && action.shifts.length > 0) {
-              // Sort shifts by start time before saving
-              const sortedShifts = [...action.shifts].sort((a, b) => 
-                a.start_time.localeCompare(b.start_time)
-              );
-              await replaceDayShifts(dayId, sortedShifts.map(shift => ({
-                date: action.day_date,
-                startTime: shift.start_time,
-                endTime: shift.end_time,
-                clientName: shift.client_name,
-                location: shift.location,
-                hourlyRate: shift.hourly_rate || 25, // Default rate
-                isPaid: shift.is_paid || false
-              })));
-              savedCount++;
-            }
+            console.log(`🔄 REPLACE: Deleting old shifts and adding ${shiftsToSave.length} new shifts`);
+            await replaceDayShifts(dayId, shiftsToSave);
+            console.log(`✅ Replace successful for ${action.day_date}`);
+            savedCount++;
           } else if (action.type === 'merge') {
-            console.log(`💾 Merging shifts for day ${action.day_date}:`, {
-              shiftsCount: action.shifts?.length || 0,
-              shifts: action.shifts
-            });
-            
-            if (action.shifts && action.shifts.length > 0) {
-              // Sort shifts by start time before saving
-              const sortedShifts = [...action.shifts].sort((a, b) => 
-                a.start_time.localeCompare(b.start_time)
-              );
-              
-              const shiftsToSave = sortedShifts.map(shift => ({
-                date: action.day_date,
-                startTime: shift.start_time,
-                endTime: shift.end_time,
-                clientName: shift.client_name,
-                location: shift.location,
-                hourlyRate: shift.hourly_rate || 25, // Default rate
-                isPaid: shift.is_paid || false
-              }));
-              
-              console.log(`  → Saving ${shiftsToSave.length} shifts to day ${dayId}`);
-              await addShiftsToDay(dayId, shiftsToSave);
-              console.log(`  ✅ Saved successfully`);
-              savedCount++;
-            } else {
-              console.log(`  ⚠️ No shifts to merge for ${action.day_date}`);
-            }
+            console.log(`➕ MERGE: Adding ${shiftsToSave.length} new shifts (keeping existing ones)`);
+            await addShiftsToDay(dayId, shiftsToSave);
+            console.log(`✅ Merge successful for ${action.day_date}`);
+            savedCount++;
           }
         } catch (err) {
-          console.error(`Error processing day ${action.day_date}:`, err);
+          console.error(`❌ Error processing day ${action.day_date}:`, err);
           errors.push(`Failed to process ${action.day_date}: ${err instanceof Error ? err.message : 'Unknown error'}`);
         }
       }
+
+      console.log(`\n📊 Final results:`, { saved: savedCount, skipped: skippedCount, errors: errors.length });
 
       // Update session
       await updateSession(sessionId, {

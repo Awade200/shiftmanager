@@ -174,15 +174,29 @@ export function useDayManagement(mobileNumber?: string) {
   // Replace day shifts
   const replaceDayShifts = async (dayId: string, shifts: ShiftFormData[]): Promise<DayShift[]> => {
     try {
-      // Delete existing shifts for the day
+      if (!mobileNumber) {
+        throw new Error('Mobile number is required for replace operation');
+      }
+
+      console.log(`🔄 Replacing shifts for day ${dayId}:`, {
+        dayId,
+        mobileNumber,
+        newShiftsCount: shifts.length
+      });
+
+      // Delete existing shifts for the day (filtered by mobile_number for data integrity)
       const { error: deleteError } = await supabase
         .from('shifts')
         .delete()
-        .eq('day_id', dayId);
+        .eq('day_id', dayId)
+        .eq('mobile_number', mobileNumber);
 
       if (deleteError) {
+        console.error('❌ Delete error:', deleteError);
         throw deleteError;
       }
+
+      console.log(`✅ Deleted old shifts, now adding ${shifts.length} new shifts`);
 
       // Add new shifts
       return await addShiftsToDay(dayId, shifts);
