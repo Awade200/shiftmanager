@@ -43,6 +43,11 @@ export function DayDetailView({ dayDate, onClose, className }: DayDetailViewProp
   const { checkDayConflicts } = useConflictDetection();
   const { toast } = useToast();
 
+  // Format time without seconds (HH:MM)
+  const formatTime = (timeString: string): string => {
+    return timeString.substring(0, 5);
+  };
+
   useEffect(() => {
     if (!authLoading && user?.mobile_number) {
       loadDayData();
@@ -264,24 +269,24 @@ export function DayDetailView({ dayDate, onClose, className }: DayDetailViewProp
   return (
     <div className={cn("space-y-6", className)}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Calendar className="h-6 w-6 text-primary" />
+          <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-primary flex-shrink-0" />
           <div>
-            <h1 className="text-2xl font-bold">{formattedDate}</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-xl sm:text-2xl font-bold">{formattedDate}</h1>
+            <p className="text-sm text-muted-foreground">
               {dayData.shift_count} shifts • {dayData.total_hours.toFixed(1)} hours
             </p>
           </div>
         </div>
-        <Button onClick={onClose} variant="outline">
-          <X className="h-4 w-4 mr-2" />
-          Close
+        <Button onClick={onClose} variant="outline" size="sm" className="self-start sm:self-auto">
+          <X className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Close</span>
         </Button>
       </div>
 
-      {/* Timeline */}
-      <Card>
+      {/* Timeline - Hidden on mobile */}
+      <Card className="hidden md:block">
         <CardHeader>
           <CardTitle>Daily Timeline</CardTitle>
         </CardHeader>
@@ -302,11 +307,11 @@ export function DayDetailView({ dayDate, onClose, className }: DayDetailViewProp
               .map((shift) => (
               <div
                 key={shift.id}
-                className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
               >
                 {editingShift === shift.id ? (
                   /* Edit Mode */
-                  <div className="flex-1 grid grid-cols-4 gap-4 items-center">
+                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                     <div>
                       <Label className="text-xs">Start Time</Label>
                       <Input
@@ -355,41 +360,53 @@ export function DayDetailView({ dayDate, onClose, className }: DayDetailViewProp
                     </div>
                   </div>
                 ) : (
-                  /* View Mode */
-                  <div className="flex-1 grid grid-cols-5 gap-4 items-center">
+                  /* View Mode - Stacked on mobile, grid on desktop */
+                  <div className="flex-1 flex flex-col md:grid md:grid-cols-5 gap-2 md:gap-4 md:items-center">
+                    {/* Time */}
                     <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">
-                        {shift.start_time} - {shift.end_time}
+                      <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span className="font-medium text-sm md:text-base">
+                        {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
+                      </span>
+                      <span className="ml-auto md:hidden text-sm text-muted-foreground">
+                        {shift.duration.toFixed(1)}h
                       </span>
                     </div>
+                    
+                    {/* Client */}
                     <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <span>{shift.client_name}</span>
+                      <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span className="text-sm md:text-base break-words">{shift.client_name}</span>
                     </div>
+                    
+                    {/* Location */}
                     <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">
+                      <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span className="text-sm text-muted-foreground break-words">
                         {shift.location || 'No location'}
                       </span>
                     </div>
-                    <div className="text-center">
+                    
+                    {/* Duration - Desktop only */}
+                    <div className="hidden md:flex md:justify-center">
                       <span className="font-medium">{shift.duration.toFixed(1)}h</span>
                     </div>
-                    <div className="flex justify-center">
+                    
+                    {/* Status Badge */}
+                    <div className="flex md:justify-center">
                       {getShiftStatusBadge(shift)}
                     </div>
                   </div>
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex gap-2">
+                <div className="flex gap-2 self-end md:self-auto">
                   {editingShift === shift.id ? (
                     <>
-                      <Button size="sm" onClick={handleSaveEdit}>
+                      <Button size="sm" onClick={handleSaveEdit} className="flex-1 md:flex-none">
                         <Save className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+                      <Button size="sm" variant="outline" onClick={handleCancelEdit} className="flex-1 md:flex-none">
                         <X className="h-4 w-4" />
                       </Button>
                     </>
@@ -399,10 +416,11 @@ export function DayDetailView({ dayDate, onClose, className }: DayDetailViewProp
                         size="sm" 
                         variant="outline"
                         onClick={() => handleEditShift(shift.id)}
+                        className="flex-1 md:flex-none"
                       >
                         <Edit3 className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" variant="outline">
+                      <Button size="sm" variant="outline" className="flex-1 md:flex-none">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </>
