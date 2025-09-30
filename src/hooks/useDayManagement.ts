@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Day, DayWithShifts, DayShift, DayStats } from '@/types/day';
 import { ShiftFormData } from '@/types/shift';
@@ -55,7 +55,7 @@ export function useDayManagement(mobileNumber?: string) {
   };
 
   // Get day with shifts
-  const getDayWithShifts = async (dayDate: string): Promise<DayWithShifts | null> => {
+  const getDayWithShifts = useCallback(async (dayDate: string): Promise<DayWithShifts | null> => {
     try {
       if (!mobileNumber) return null;
 
@@ -102,7 +102,7 @@ export function useDayManagement(mobileNumber?: string) {
       console.error('Error getting day with shifts:', err);
       return null;
     }
-  };
+  }, [mobileNumber]);
 
   // Create or get day
   const getOrCreateDay = async (dayDate: string, mobileNumber: string): Promise<string> => {

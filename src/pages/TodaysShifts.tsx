@@ -15,6 +15,11 @@ const TodaysShifts = () => {
 
   useEffect(() => {
     const loadTodaysShifts = async () => {
+      if (!user?.mobile_number) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const today = format(new Date(), 'yyyy-MM-dd');
         const dayWithShifts = await getDayWithShifts(today);
@@ -39,7 +44,7 @@ const TodaysShifts = () => {
     };
 
     loadTodaysShifts();
-  }, [getDayWithShifts]);
+  }, [user?.mobile_number, getDayWithShifts]);
 
   const formatTime = (time: string) => {
     try {
