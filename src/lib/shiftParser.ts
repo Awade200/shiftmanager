@@ -51,7 +51,8 @@ function preprocessText(rawText: string): string[] {
   let normalized = rawText
     .replace(/[\r\n\u2028\u2029]/g, '\n')
     .replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F]/g, '')
-    .replace(/\u00A0/g, ' '); // Replace non-breaking spaces
+    .replace(/\u00A0/g, ' ') // Replace non-breaking spaces
+    .replace(/[\u2011\u2013\u2014]/g, '-'); // Normalize special dashes/hyphens to regular hyphen
 
   // Split into lines and further split long wrapped lines at multiple spaces
   let lines = normalized.split('\n');
@@ -108,6 +109,157 @@ function computeHours(startTime: string, endTime: string): number {
   }
   
   return (end - start) / 60;
+}
+
+// Detect and parse pipe-delimited table format
+function detectAndParseTableFormat(rawText: string): { isTable: boolean; rows: string[][] } {
+  const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  
+  // Check if this looks like a pipe-delimited table
+  const pipeLines = lines.filter(line => line.includes('|'));
+  const isPipeTable = pipeLines.length > 3; // Need at least a few rows
+  
+  if (!isPipeTable) {
+    return { isTable: false, rows: [] };
+  }
+  
+  // Parse table rows
+  const rows: string[][] = [];
+  for (const line of pipeLines) {
+    // Skip separator lines (e.g., |---|---|)
+    if (/^\|[\s\-|]+\|$/.test(line)) continue;
+    
+    // Split by pipe and clean up cells
+    const cells = line
+      .split('|')
+      .map(cell => cell.trim())
+      .filter(cell => cell.length > 0);
+    
+    if (cells.length > 0) {
+      rows.push(cells);
+    }
+  }
+  
+  return { isTable: true, rows };
+}
+
+// Parse Employee Timesheet table format
+function parseEmployeeTimesheetTable(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr'): ParseResult {
+  const { rows } = detectAndParseTableFormat(rawText);
+  const shifts: ShiftRow[] = [];
+  const warnings: string[] = [];
+  
+  console.log(`Parsing ${rows.length} table rows from Employee Timesheet`);
+  
+  let i = 0;
+  while (i < rows.length) {
+    const row = rows[i];
+    
+    // Skip header rows
+    const firstCell = row[0]?.toLowerCase() || '';
+    if (firstCell.includes('day') || firstCell.includes('client') || 
+        firstCell.includes('service') || firstCell.includes('quantity') ||
+        firstCell === '' || row.length < 2) {
+      i++;
+      continue;
+    }
+    
+    // Data rows come in pairs:
+    // Row 1: Day/Date | Client Code | Service | Hours
+    // Row 2: (empty) | Client Name | Time Range | (empty)
+    
+    if (i + 1 >= rows.length) {
+      console.warn('Incomplete pair at end of table');
+      break;
+    }
+    
+    const row1 = row;
+    const row2 = rows[i + 1];
+    
+    // Extract from row 1
+    const dayDateStr = row1[0] || '';
+    const clientCode = row1[1] || '';
+    const service = row1[2] || '';
+    const hoursStr = row1[3] || '';
+    
+    // Extract from row 2
+    const clientName = row2[1] || '';
+    const timeRangeStr = row2[2] || '';
+    
+    // Parse day and date from "Monday 06/10/2025" format
+    const dayMatch = dayDateStr.match(/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Mon|Tue|Wed|Thu|Fri|Sat|Sun)/i);
+    const dateMatch = dayDateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    
+    if (!dayMatch || !dateMatch) {
+      console.warn(`Could not parse day/date from: ${dayDateStr}`);
+      i += 2;
+      continue;
+    }
+    
+    const day = dayMatch[1];
+    const [, dayNum, month, year] = dateMatch;
+    const date = `${year}-${month.padStart(2, '0')}-${dayNum.padStart(2, '0')}`;
+    
+    // Parse time range (e.g., "08:00 - 09:00")
+    const timeMatch = timeRangeStr.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
+    if (!timeMatch) {
+      console.warn(`Could not parse time from: ${timeRangeStr}`);
+      i += 2;
+      continue;
+    }
+    
+    const startTime = normalizeTime(timeMatch[1]);
+    const endTime = normalizeTime(timeMatch[2]);
+    const hours = parseFloat(hoursStr) || computeHours(startTime, endTime);
+    
+    // Validate we have minimum required data
+    if (!clientCode.match(/^CD\d+/i)) {
+      console.warn(`Invalid client code: ${clientCode}`);
+      i += 2;
+      continue;
+    }
+    
+    shifts.push({
+      day,
+      date,
+      clientCode: clientCode.trim(),
+      clientName: clientName.trim() || 'Unknown Client',
+      service: service.trim() || 'Shift',
+      startTime,
+      endTime,
+      hours,
+      sourceType,
+      rawLines: [dayDateStr, clientCode, service, clientName, timeRangeStr],
+      hoursCorrected: false,
+      needsLocation: !clientName
+    });
+    
+    i += 2; // Move to next pair
+  }
+  
+  console.log(`✅ Extracted ${shifts.length} shifts from Employee Timesheet table`);
+  
+  if (shifts.length === 0) {
+    warnings.push('No valid shifts found in table format');
+  }
+  
+  // Sort chronologically
+  const sortedShifts = shifts.sort((a, b) => {
+    const dateCompare = a.date.localeCompare(b.date);
+    if (dateCompare !== 0) return dateCompare;
+    return a.startTime.localeCompare(b.startTime);
+  });
+  
+  return {
+    shifts: sortedShifts,
+    warnings,
+    debugInfo: {
+      totalLines: rows.length,
+      processedLines: shifts.length * 2,
+      unknownLines: [],
+      detectedFormat: 'tabular'
+    }
+  };
 }
 
 // Detect multi-line day-based format
@@ -494,6 +646,12 @@ export function parseRota(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr' =
 
 // Auto-detect format and route to appropriate parser
 export function extractShiftsAuto(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr'): ParseResult {
+  // Check for Employee Timesheet table format first (highest specificity)
+  if (rawText.includes('|') && rawText.includes('Employee Timesheet')) {
+    console.log('✅ Detected Employee Timesheet table format');
+    return parseEmployeeTimesheetTable(rawText, sourceType);
+  }
+  
   // Simple heuristics to detect format
   const lines = preprocessText(rawText);
   
