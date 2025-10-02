@@ -9,13 +9,24 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLi
 export const useOCR = () => {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  
+  // Store reference to PDF loading task for cancellation
+  let pdfLoadingTask: any = null;
 
-  // Timeout wrapper for async operations
-  const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, errorMsg: string): Promise<T> => {
+  // Timeout wrapper for async operations with cancellation support
+  const withTimeout = <T,>(
+    promise: Promise<T>, 
+    timeoutMs: number, 
+    errorMsg: string,
+    onTimeout?: () => void
+  ): Promise<T> => {
     return Promise.race([
       promise,
       new Promise<T>((_, reject) =>
-        setTimeout(() => reject(new Error(errorMsg)), timeoutMs)
+        setTimeout(() => {
+          if (onTimeout) onTimeout();
+          reject(new Error(errorMsg));
+        }, timeoutMs)
       ),
     ]);
   };
@@ -49,7 +60,7 @@ export const useOCR = () => {
       if (file.type === 'application/pdf') {
         console.log('Processing PDF file with text extraction...');
         
-        // Load PDF with timeout and retry
+        // Load PDF with timeout
         const arrayBuffer = await withTimeout(
           file.arrayBuffer(),
           30000,
@@ -58,19 +69,27 @@ export const useOCR = () => {
         
         console.log('PDF file loaded, initializing worker...');
         
-        // Load PDF document with timeout and retry
+        // Load PDF document with timeout and cancellation support (reduced to 30s)
         const pdf = await withTimeout(
           withRetry(async () => {
-            const loadingTask = pdfjsLib.getDocument({
+            pdfLoadingTask = pdfjsLib.getDocument({
               data: arrayBuffer,
               useWorkerFetch: false,
               isEvalSupported: false,
               useSystemFonts: true,
             });
-            return await loadingTask.promise;
+            return await pdfLoadingTask.promise;
           }),
-          60000,
-          'PDF processing timeout - document may be corrupted or too complex'
+          30000, // Reduced from 60s to 30s
+          'PDF processing timeout (30s) - file may be too large or corrupted',
+          () => {
+            // Cleanup on timeout
+            if (pdfLoadingTask) {
+              console.log('Destroying PDF worker due to timeout...');
+              pdfLoadingTask.destroy();
+              pdfLoadingTask = null;
+            }
+          }
         );
         
         console.log(`PDF loaded successfully, processing ${pdf.numPages} pages...`);
@@ -82,13 +101,13 @@ export const useOCR = () => {
         for (let pageNum = 1; pageNum <= numPages; pageNum++) {
           console.log(`Processing page ${pageNum}/${numPages}...`);
           
-          const page = await withTimeout(
+          const page: any = await withTimeout(
             pdf.getPage(pageNum),
             30000,
             `Timeout loading page ${pageNum}`
           );
           
-          const textContent = await withTimeout(
+          const textContent: any = await withTimeout(
             page.getTextContent(),
             30000,
             `Timeout extracting text from page ${pageNum}`
@@ -97,6 +116,12 @@ export const useOCR = () => {
           const pageText = textContent.items.map((item: any) => item.str).join(' ');
           text += pageText + '\n';
           setProgress(Math.round((pageNum / numPages) * 100));
+        }
+        
+        // Cleanup PDF worker after successful processing
+        if (pdfLoadingTask) {
+          pdfLoadingTask.destroy();
+          pdfLoadingTask = null;
         }
         
         console.log('PDF text extracted successfully:', text.substring(0, 200) + '...');
@@ -127,10 +152,21 @@ export const useOCR = () => {
     } catch (error) {
       console.error('Extraction Error:', error);
       
+      // Cleanup PDF worker on error
+      if (pdfLoadingTask) {
+        console.log('Cleaning up PDF worker after error...');
+        try {
+          pdfLoadingTask.destroy();
+        } catch (destroyError) {
+          console.error('Error destroying PDF worker:', destroyError);
+        }
+        pdfLoadingTask = null;
+      }
+      
       // Provide more helpful error messages
       if (error instanceof Error) {
         if (error.message.includes('timeout')) {
-          throw new Error(`Processing timeout: ${error.message}`);
+          throw new Error(`Processing timeout: ${error.message}. Try uploading as an image instead.`);
         } else if (error.message.includes('worker')) {
           throw new Error('PDF processing failed. Please try uploading as an image instead.');
         } else if (error.message.includes('empty')) {
@@ -140,8 +176,18 @@ export const useOCR = () => {
       
       throw new Error('Failed to extract text from file. Please try a different file format or quality.');
     } finally {
+      // Always ensure loading state is cleared and worker is cleaned up
       setLoading(false);
       setProgress(0);
+      if (pdfLoadingTask) {
+        console.log('Final cleanup of PDF worker...');
+        try {
+          pdfLoadingTask.destroy();
+        } catch (e) {
+          console.error('Error in final PDF worker cleanup:', e);
+        }
+        pdfLoadingTask = null;
+      }
     }
   };
 
