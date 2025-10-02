@@ -1,17 +1,11 @@
 import { useState } from 'react';
 import Tesseract from 'tesseract.js';
-import * as pdfjsLib from 'pdfjs-dist';
+import { supabase } from '@/integrations/supabase/client';
 import { OCRResult } from '@/types/shift';
-
-// Set the worker path for PDF.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
 
 export const useOCR = () => {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
-  
-  // Store reference to PDF loading task for cancellation
-  let pdfLoadingTask: any = null;
 
   // Timeout wrapper for async operations with cancellation support
   const withTimeout = <T,>(
@@ -58,73 +52,30 @@ export const useOCR = () => {
 
       // Handle PDFs differently from images
       if (file.type === 'application/pdf') {
-        console.log('Processing PDF file with text extraction...');
+        console.log('Processing PDF via backend...');
+        setProgress(10);
         
-        // Load PDF with timeout
-        const arrayBuffer = await withTimeout(
-          file.arrayBuffer(),
-          30000,
-          'PDF file read timeout - file may be too large'
-        );
+        // Convert file to base64
+        const base64 = await fileToBase64(file);
+        setProgress(30);
         
-        console.log('PDF file loaded, initializing worker...');
-        
-        // Load PDF document with timeout and cancellation support (reduced to 30s)
-        const pdf = await withTimeout(
-          withRetry(async () => {
-            pdfLoadingTask = pdfjsLib.getDocument({
-              data: arrayBuffer,
-              useWorkerFetch: false,
-              isEvalSupported: false,
-              useSystemFonts: true,
-            });
-            return await pdfLoadingTask.promise;
-          }),
-          30000, // Reduced from 60s to 30s
-          'PDF processing timeout (30s) - file may be too large or corrupted',
-          () => {
-            // Cleanup on timeout
-            if (pdfLoadingTask) {
-              console.log('Destroying PDF worker due to timeout...');
-              pdfLoadingTask.destroy();
-              pdfLoadingTask = null;
-            }
-          }
-        );
-        
-        console.log(`PDF loaded successfully, processing ${pdf.numPages} pages...`);
-        
-        text = '';
-        const numPages = pdf.numPages;
-        
-        // Process each page with timeout
-        for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-          console.log(`Processing page ${pageNum}/${numPages}...`);
-          
-          const page: any = await withTimeout(
-            pdf.getPage(pageNum),
-            30000,
-            `Timeout loading page ${pageNum}`
-          );
-          
-          const textContent: any = await withTimeout(
-            page.getTextContent(),
-            30000,
-            `Timeout extracting text from page ${pageNum}`
-          );
-          
-          const pageText = textContent.items.map((item: any) => item.str).join(' ');
-          text += pageText + '\n';
-          setProgress(Math.round((pageNum / numPages) * 100));
+        // Send to backend edge function
+        const { data, error } = await supabase.functions.invoke('parse-pdf', {
+          body: { file: base64 }
+        });
+
+        if (error) {
+          console.error('Backend PDF parsing error:', error);
+          throw new Error(`PDF parsing failed: ${error.message}`);
         }
-        
-        // Cleanup PDF worker after successful processing
-        if (pdfLoadingTask) {
-          pdfLoadingTask.destroy();
-          pdfLoadingTask = null;
+
+        if (!data?.text) {
+          throw new Error('No text extracted from PDF');
         }
-        
-        console.log('PDF text extracted successfully:', text.substring(0, 200) + '...');
+
+        text = data.text;
+        setProgress(100);
+        console.log('PDF text extracted successfully via backend');
         
         if (!text.trim()) {
           throw new Error('PDF appears to be empty or contains only images. Try uploading as an image instead.');
@@ -152,23 +103,10 @@ export const useOCR = () => {
     } catch (error) {
       console.error('Extraction Error:', error);
       
-      // Cleanup PDF worker on error
-      if (pdfLoadingTask) {
-        console.log('Cleaning up PDF worker after error...');
-        try {
-          pdfLoadingTask.destroy();
-        } catch (destroyError) {
-          console.error('Error destroying PDF worker:', destroyError);
-        }
-        pdfLoadingTask = null;
-      }
-      
       // Provide more helpful error messages
       if (error instanceof Error) {
         if (error.message.includes('timeout')) {
           throw new Error(`Processing timeout: ${error.message}. Try uploading as an image instead.`);
-        } else if (error.message.includes('worker')) {
-          throw new Error('PDF processing failed. Please try uploading as an image instead.');
         } else if (error.message.includes('empty')) {
           throw error;
         }
@@ -176,19 +114,22 @@ export const useOCR = () => {
       
       throw new Error('Failed to extract text from file. Please try a different file format or quality.');
     } finally {
-      // Always ensure loading state is cleared and worker is cleaned up
       setLoading(false);
       setProgress(0);
-      if (pdfLoadingTask) {
-        console.log('Final cleanup of PDF worker...');
-        try {
-          pdfLoadingTask.destroy();
-        } catch (e) {
-          console.error('Error in final PDF worker cleanup:', e);
-        }
-        pdfLoadingTask = null;
-      }
     }
+  };
+
+  // Helper function to convert file to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   };
 
   const parseRotaText = (text: string): OCRResult[] => {
