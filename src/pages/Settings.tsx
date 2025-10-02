@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings as SettingsIcon, Database, Archive, Zap } from 'lucide-react';
+import { Settings as SettingsIcon, Database, Archive, Zap, Bell } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { DataMigration } from '@/components/DataMigration';
 import { BatchOperations } from '@/components/BatchOperations';
 import { HistoricalAnalysis } from '@/components/HistoricalAnalysis';
+import { NotificationSettings } from '@/components/NotificationSettings';
 import { useShifts } from '@/hooks/useShifts';
 import { useToast } from '@/hooks/use-toast';
 
@@ -50,22 +51,26 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="migration" className="space-y-6">
-        <TabsList className="grid grid-cols-4 w-full md:w-auto">
+        <TabsList className="grid grid-cols-5 w-full md:w-auto">
           <TabsTrigger value="migration" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
-            Migration
+            <span className="hidden sm:inline">Migration</span>
           </TabsTrigger>
           <TabsTrigger value="batch" className="flex items-center gap-2">
             <Archive className="h-4 w-4" />
-            Batch Ops
+            <span className="hidden sm:inline">Batch Ops</span>
           </TabsTrigger>
           <TabsTrigger value="analysis" className="flex items-center gap-2">
             <Zap className="h-4 w-4" />
-            Analysis
+            <span className="hidden sm:inline">Analysis</span>
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            <span className="hidden sm:inline">Notifications</span>
           </TabsTrigger>
           <TabsTrigger value="general" className="flex items-center gap-2">
             <SettingsIcon className="h-4 w-4" />
-            General
+            <span className="hidden sm:inline">General</span>
           </TabsTrigger>
         </TabsList>
 
@@ -79,6 +84,10 @@ export default function Settings() {
 
         <TabsContent value="analysis">
           <HistoricalAnalysis />
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <NotificationSettings />
         </TabsContent>
 
         <TabsContent value="general">

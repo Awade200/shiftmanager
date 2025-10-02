@@ -2,3 +2,6 @@ project_id = "xifveewakokjugldqqaz"
 
 [functions.parse-pdf]
 verify_jwt = false
+
+[functions.send-shift-reminders]
+verify_jwt = false
