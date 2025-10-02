@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { extractText, getDocumentProxy } from "https://esm.sh/unpdf@0.11.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,16 +23,16 @@ serve(async (req) => {
     // Decode base64 file
     const pdfData = Uint8Array.from(atob(file), c => c.charCodeAt(0));
     
-    // Use pdf-parse library to extract text
-    const pdfParse = await import("https://esm.sh/pdf-parse@1.1.1");
-    const data = await pdfParse.default(pdfData);
+    // Use unpdf library to extract text (Deno-compatible)
+    const pdf = await getDocumentProxy(pdfData);
+    const { text, totalPages } = await extractText(pdf, { mergePages: true });
     
-    console.log(`Extracted ${data.text.length} characters from PDF`);
+    console.log(`Extracted ${text.length} characters from ${totalPages} pages`);
 
     return new Response(
       JSON.stringify({ 
-        text: data.text,
-        pages: data.numpages 
+        text: text,
+        pages: totalPages 
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
