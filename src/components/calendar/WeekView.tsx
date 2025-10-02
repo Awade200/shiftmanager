@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Day } from '@/types/day';
 import { useDayManagement } from '@/hooks/useDayManagement';
 import { useMobileAuth } from '@/hooks/useMobileAuth';
+import { useShifts } from '@/hooks/useShifts';
 import { cn } from '@/lib/utils';
 
 interface WeekViewProps {
@@ -32,6 +33,7 @@ export function WeekView({
 }: WeekViewProps) {
   const { user } = useMobileAuth();
   const { days, loading } = useDayManagement(user?.mobile_number);
+  const { settings } = useShifts();
 
   const weekDays = useMemo(() => {
     const start = startOfWeek(selectedDate, { weekStartsOn: 1 }); // Monday start
@@ -150,7 +152,7 @@ export function WeekView({
           </div>
           
           <div className="text-muted-foreground">
-            £{dayData ? (dayData.total_hours * 25).toFixed(0) : '0'}
+            £{dayData ? (dayData.total_hours * settings.defaultHourlyRate).toFixed(0) : '0'}
           </div>
         </div>
 
@@ -211,7 +213,7 @@ export function WeekView({
         <div className="flex gap-6 text-sm text-muted-foreground">
           <span>Total: {weekTotal.toFixed(1)} hours</span>
           <span>{weekShifts} shifts</span>
-          <span>£{(weekTotal * 25).toFixed(0)} estimated</span>
+          <span>£{(weekTotal * settings.defaultHourlyRate).toFixed(0)} estimated</span>
         </div>
       </CardHeader>
       

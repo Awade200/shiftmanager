@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Day } from '@/types/day';
 import { useDayManagement } from '@/hooks/useDayManagement';
 import { useMobileAuth } from '@/hooks/useMobileAuth';
+import { useShifts } from '@/hooks/useShifts';
 import { cn } from '@/lib/utils';
 
 interface DayCalendarViewProps {
@@ -25,6 +26,7 @@ export function DayCalendarView({
   const [currentMonth, setCurrentMonth] = useState(selectedDate);
   const { user } = useMobileAuth();
   const { days, loading } = useDayManagement(user?.mobile_number);
+  const { settings } = useShifts();
 
   const monthDays = useMemo(() => {
     const start = startOfMonth(currentMonth);
@@ -128,7 +130,7 @@ export function DayCalendarView({
               {dayData.total_hours.toFixed(1)}h
             </div>
             <div className="text-xs text-muted-foreground">
-              £{(dayData.total_hours * 25).toFixed(0)}
+              £{(dayData.total_hours * settings.defaultHourlyRate).toFixed(0)}
             </div>
             
             {/* Status badges */}

@@ -13,7 +13,7 @@ import { useShifts } from '@/hooks/useShifts';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Settings() {
-  const { settings, updateSettings, exportToCSV } = useShifts();
+  const { settings, updateSettings, exportToCSV, shifts, updateAllShiftsHourlyRate } = useShifts();
   const { toast } = useToast();
 
   const handleSettingsUpdate = (key: string, value: any) => {
@@ -118,6 +118,43 @@ export default function Settings() {
                   />
                   <Label htmlFor="anonymization">Use name anonymization</Label>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Bulk Rate Update */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Bulk Hourly Rate Update</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 bg-muted rounded-lg space-y-2">
+                  <div className="text-sm font-medium">Current Shifts: {shifts.length}</div>
+                  <div className="text-sm text-muted-foreground">
+                    Update all existing shifts to your current default rate of £{settings.defaultHourlyRate.toFixed(2)}/hour
+                  </div>
+                </div>
+                <Button 
+                  onClick={async () => {
+                    if (window.confirm(`Update all ${shifts.length} shifts to £${settings.defaultHourlyRate.toFixed(2)}/hour?`)) {
+                      const success = await updateAllShiftsHourlyRate(settings.defaultHourlyRate);
+                      if (success) {
+                        toast({
+                          title: "Rates updated",
+                          description: `All ${shifts.length} shifts have been updated to £${settings.defaultHourlyRate.toFixed(2)}/hour`,
+                        });
+                      } else {
+                        toast({
+                          title: "Update failed",
+                          description: "Failed to update shift rates",
+                          variant: "destructive"
+                        });
+                      }
+                    }
+                  }}
+                  className="w-full md:w-auto"
+                >
+                  Update All Shifts to £{settings.defaultHourlyRate.toFixed(2)}/hour
+                </Button>
               </CardContent>
             </Card>
 

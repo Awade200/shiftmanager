@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useDayManagement } from '@/hooks/useDayManagement';
 import { useToast } from '@/hooks/use-toast';
+import { useShifts } from '@/hooks/useShifts';
 import { Day } from '@/types/day';
 import { format, parseISO, isWithinInterval, subDays, subWeeks, subMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -42,6 +43,7 @@ export function BatchOperations({ className }: BatchOperationsProps) {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const { days, loading } = useDayManagement();
+  const { settings } = useShifts();
   const { toast } = useToast();
 
   // Filter days based on criteria
@@ -74,7 +76,7 @@ export function BatchOperations({ className }: BatchOperationsProps) {
       count: selected.length,
       totalHours: selected.reduce((sum, day) => sum + day.total_hours, 0),
       totalShifts: selected.reduce((sum, day) => sum + day.shift_count, 0),
-      estimatedEarnings: selected.reduce((sum, day) => sum + (day.total_hours * 25), 0),
+      estimatedEarnings: selected.reduce((sum, day) => sum + (day.total_hours * settings.defaultHourlyRate), 0),
       conflicts: selected.filter(day => day.has_conflicts).length,
       unresolved: selected.filter(day => day.has_unresolved).length
     };
@@ -164,7 +166,7 @@ export function BatchOperations({ className }: BatchOperationsProps) {
         day.day_date,
         day.total_hours.toFixed(1),
         day.shift_count,
-        (day.total_hours * 25).toFixed(2),
+        (day.total_hours * settings.defaultHourlyRate).toFixed(2),
         day.has_conflicts ? 'Conflicts' : day.has_unresolved ? 'Unresolved' : 'Ready'
       ].join(','))
     ].join('\n');
@@ -405,7 +407,7 @@ export function BatchOperations({ className }: BatchOperationsProps) {
                       <div className="text-sm text-muted-foreground">{day.shift_count} shifts</div>
                     </div>
                     <div className="text-center">
-                      <div className="font-medium">£{(day.total_hours * 25).toFixed(0)}</div>
+                      <div className="font-medium">£{(day.total_hours * settings.defaultHourlyRate).toFixed(0)}</div>
                       <div className="text-sm text-muted-foreground">estimated</div>
                     </div>
                     <div className="flex justify-center">

@@ -12,6 +12,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useDayManagement } from '@/hooks/useDayManagement';
+import { useShifts } from '@/hooks/useShifts';
 import { Day } from '@/types/day';
 import { 
   format, 
@@ -50,6 +51,7 @@ interface MonthlyTrend {
 
 export function HistoricalAnalysis({ className }: HistoricalAnalysisProps) {
   const { days, loading, dayStats } = useDayManagement();
+  const { settings } = useShifts();
 
   // Calculate weekly comparisons (last 8 weeks)
   const weeklyComparisons = useMemo((): WeeklyComparison[] => {
@@ -72,7 +74,7 @@ export function HistoricalAnalysis({ className }: HistoricalAnalysisProps) {
       weeks.push({
         week: `Week of ${format(weekStart, 'MMM d')}`,
         totalHours,
-        totalEarnings: totalHours * 25,
+        totalEarnings: totalHours * settings.defaultHourlyRate,
         shiftCount,
         avgHoursPerDay: daysWorked > 0 ? totalHours / daysWorked : 0,
         daysWorked
@@ -118,7 +120,7 @@ export function HistoricalAnalysis({ className }: HistoricalAnalysisProps) {
       months.push({
         month: format(monthStart, 'MMM yyyy'),
         totalHours,
-        totalEarnings: totalHours * 25,
+        totalEarnings: totalHours * settings.defaultHourlyRate,
         avgDailyHours: workingDays.length > 0 ? totalHours / workingDays.length : 0,
         bestDay,
         worstDay

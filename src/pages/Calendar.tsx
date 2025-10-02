@@ -7,6 +7,7 @@ import { WeekView } from '@/components/calendar/WeekView';
 import { DayDetailView } from '@/components/DayDetailView';
 import { useDayManagement } from '@/hooks/useDayManagement';
 import { useMobileAuth } from '@/hooks/useMobileAuth';
+import { useShifts } from '@/hooks/useShifts';
 
 type CalendarViewType = 'month' | 'week' | 'list';
 
@@ -17,6 +18,7 @@ export default function Calendar() {
   
   const { user } = useMobileAuth();
   const { days, loading, dayStats } = useDayManagement(user?.mobile_number);
+  const { settings } = useShifts();
 
   const handleDayClick = (dayDate: string) => {
     setSelectedDayDate(dayDate);
@@ -125,7 +127,7 @@ export default function Calendar() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-success">
-              £{(dayStats.total_hours * 25).toFixed(0)}
+              £{(dayStats.total_hours * settings.defaultHourlyRate).toFixed(0)}
             </div>
           </CardContent>
         </Card>

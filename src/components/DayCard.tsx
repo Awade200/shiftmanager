@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Day } from '@/types/day';
+import { useShifts } from '@/hooks/useShifts';
 import { cn } from '@/lib/utils';
 
 interface DayCardProps {
@@ -26,6 +27,7 @@ export function DayCard({
   isUploadSession = false,
   className
 }: DayCardProps) {
+  const { settings } = useShifts();
   const dayDate = parseISO(day.day_date);
   const formattedDate = format(dayDate, 'EEE, dd MMM yyyy');
   const dayName = format(dayDate, 'EEEE');
@@ -116,7 +118,7 @@ export function DayCard({
           
           <div className="text-center">
             <div className="text-2xl font-bold text-primary">
-              £{(day.total_hours * 25).toFixed(0)}
+              £{(day.total_hours * settings.defaultHourlyRate).toFixed(0)}
             </div>
             <div className="text-sm text-muted-foreground">Estimated</div>
           </div>
