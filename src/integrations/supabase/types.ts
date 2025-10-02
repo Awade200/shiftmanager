@@ -976,6 +976,83 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_log: {
+        Row: {
+          channel: string
+          error_message: string | null
+          id: string
+          mobile_number: string
+          sent_at: string | null
+          shift_id: string | null
+          status: string
+        }
+        Insert: {
+          channel: string
+          error_message?: string | null
+          id?: string
+          mobile_number: string
+          sent_at?: string | null
+          shift_id?: string | null
+          status: string
+        }
+        Update: {
+          channel?: string
+          error_message?: string | null
+          id?: string
+          mobile_number?: string
+          sent_at?: string | null
+          shift_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_log_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_preferences: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          email_enabled: boolean | null
+          id: string
+          mobile_number: string
+          phone_number: string | null
+          reminder_hours_before: number | null
+          sms_enabled: boolean | null
+          updated_at: string | null
+          whatsapp_enabled: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          email_enabled?: boolean | null
+          id?: string
+          mobile_number: string
+          phone_number?: string | null
+          reminder_hours_before?: number | null
+          sms_enabled?: boolean | null
+          updated_at?: string | null
+          whatsapp_enabled?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          email_enabled?: boolean | null
+          id?: string
+          mobile_number?: string
+          phone_number?: string | null
+          reminder_hours_before?: number | null
+          sms_enabled?: boolean | null
+          updated_at?: string | null
+          whatsapp_enabled?: boolean | null
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           created_at: string
