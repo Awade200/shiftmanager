@@ -10,6 +10,34 @@ export const useOCR = () => {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
 
+  // Timeout wrapper for async operations
+  const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, errorMsg: string): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error(errorMsg)), timeoutMs)
+      ),
+    ]);
+  };
+
+  // Retry wrapper for network operations
+  const withRetry = async <T,>(
+    fn: () => Promise<T>,
+    retries: number = 3,
+    delayMs: number = 1000
+  ): Promise<T> => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await fn();
+      } catch (error) {
+        console.log(`Attempt ${i + 1} failed:`, error);
+        if (i === retries - 1) throw error;
+        await new Promise(resolve => setTimeout(resolve, delayMs * (i + 1)));
+      }
+    }
+    throw new Error('All retries failed');
+  };
+
   const extractShiftsFromImage = async (file: File): Promise<string> => {
     setLoading(true);
     setProgress(0);
@@ -20,32 +48,76 @@ export const useOCR = () => {
       // Handle PDFs differently from images
       if (file.type === 'application/pdf') {
         console.log('Processing PDF file with text extraction...');
-        const arrayBuffer = await file.arrayBuffer();
-        const loadingTask = pdfjsLib.getDocument(arrayBuffer);
-        const pdf = await loadingTask.promise;
+        
+        // Load PDF with timeout and retry
+        const arrayBuffer = await withTimeout(
+          file.arrayBuffer(),
+          30000,
+          'PDF file read timeout - file may be too large'
+        );
+        
+        console.log('PDF file loaded, initializing worker...');
+        
+        // Load PDF document with timeout and retry
+        const pdf = await withTimeout(
+          withRetry(async () => {
+            const loadingTask = pdfjsLib.getDocument({
+              data: arrayBuffer,
+              useWorkerFetch: false,
+              isEvalSupported: false,
+              useSystemFonts: true,
+            });
+            return await loadingTask.promise;
+          }),
+          60000,
+          'PDF processing timeout - document may be corrupted or too complex'
+        );
+        
+        console.log(`PDF loaded successfully, processing ${pdf.numPages} pages...`);
         
         text = '';
         const numPages = pdf.numPages;
         
+        // Process each page with timeout
         for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-          const page = await pdf.getPage(pageNum);
-          const textContent = await page.getTextContent();
+          console.log(`Processing page ${pageNum}/${numPages}...`);
+          
+          const page = await withTimeout(
+            pdf.getPage(pageNum),
+            30000,
+            `Timeout loading page ${pageNum}`
+          );
+          
+          const textContent = await withTimeout(
+            page.getTextContent(),
+            30000,
+            `Timeout extracting text from page ${pageNum}`
+          );
+          
           const pageText = textContent.items.map((item: any) => item.str).join(' ');
           text += pageText + '\n';
           setProgress(Math.round((pageNum / numPages) * 100));
         }
         
-        console.log('PDF text extracted:', text);
+        console.log('PDF text extracted successfully:', text.substring(0, 200) + '...');
+        
+        if (!text.trim()) {
+          throw new Error('PDF appears to be empty or contains only images. Try uploading as an image instead.');
+        }
       } else {
         console.log('Processing image file with OCR...');
-        // Use OCR for images
-        const result = await Tesseract.recognize(file, 'eng', {
-          logger: (info) => {
-            if (info.status === 'recognizing text') {
-              setProgress(Math.round(info.progress * 100));
-            }
-          },
-        });
+        // Use OCR for images with timeout
+        const result = await withTimeout(
+          Tesseract.recognize(file, 'eng', {
+            logger: (info) => {
+              if (info.status === 'recognizing text') {
+                setProgress(Math.round(info.progress * 100));
+              }
+            },
+          }),
+          120000,
+          'OCR processing timeout - image may be too large or complex'
+        );
         text = result.data.text;
         console.log('OCR text extracted:', text);
       }
@@ -54,7 +126,19 @@ export const useOCR = () => {
       return text;
     } catch (error) {
       console.error('Extraction Error:', error);
-      throw new Error('Failed to extract text from file');
+      
+      // Provide more helpful error messages
+      if (error instanceof Error) {
+        if (error.message.includes('timeout')) {
+          throw new Error(`Processing timeout: ${error.message}`);
+        } else if (error.message.includes('worker')) {
+          throw new Error('PDF processing failed. Please try uploading as an image instead.');
+        } else if (error.message.includes('empty')) {
+          throw error;
+        }
+      }
+      
+      throw new Error('Failed to extract text from file. Please try a different file format or quality.');
     } finally {
       setLoading(false);
       setProgress(0);

@@ -17,11 +17,26 @@ export function SmartShiftUpload({ onTextExtracted }: SmartShiftUploadProps) {
   const [inputText, setInputText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastResult, setLastResult] = useState<ParseResult | null>(null);
+  const [processingType, setProcessingType] = useState<'text' | 'pdf' | 'image' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   const { extractShiftsFromImage, loading: ocrLoading, progress } = useOCR();
   const { toast } = useToast();
+
+  const handleCancel = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsProcessing(false);
+    setProcessingType(null);
+    toast({
+      title: "Cancelled",
+      description: "Processing cancelled",
+    });
+  };
 
   const handleTextParse = async () => {
     if (!inputText.trim()) {
@@ -77,10 +92,20 @@ export function SmartShiftUpload({ onTextExtracted }: SmartShiftUploadProps) {
     }
 
     setIsProcessing(true);
+    setProcessingType('pdf');
+    abortControllerRef.current = new AbortController();
+    
     try {
+      console.log('Starting PDF processing...', { size: file.size, name: file.name });
+      
       // Extract raw text from PDF
       const rawText = await extractShiftsFromImage(file);
-      console.log('PDF raw text extracted:', rawText);
+      console.log('PDF raw text extracted, length:', rawText.length);
+
+      // Check if cancelled
+      if (abortControllerRef.current?.signal.aborted) {
+        return;
+      }
 
       // Parse with our smart engine
       const result = extractShiftsAuto(rawText, 'pdf');
@@ -95,19 +120,26 @@ export function SmartShiftUpload({ onTextExtracted }: SmartShiftUploadProps) {
       } else {
         onTextExtracted(rawText, result.warnings);
         toast({
-          title: "PDF processed",
+          title: "PDF processed successfully",
           description: `Extracted ${result.shifts.length} shifts from PDF`,
         });
       }
     } catch (error) {
       console.error('PDF processing error:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
       toast({
         title: "PDF processing failed",
-        description: "Could not process the PDF file",
+        description: errorMessage.includes('timeout') 
+          ? "PDF processing timeout. Try uploading as an image instead."
+          : "Could not process the PDF file. " + errorMessage,
         variant: "destructive"
       });
     } finally {
       setIsProcessing(false);
+      setProcessingType(null);
+      abortControllerRef.current = null;
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -127,10 +159,20 @@ export function SmartShiftUpload({ onTextExtracted }: SmartShiftUploadProps) {
       return;
     }
 
+    setProcessingType('image');
+    abortControllerRef.current = new AbortController();
+    
     try {
+      console.log('Starting image OCR processing...', { size: file.size, name: file.name });
+      
       // Use OCR to extract raw text from image
       const rawText = await extractShiftsFromImage(file);
-      console.log('Image raw text extracted:', rawText);
+      console.log('Image raw text extracted, length:', rawText.length);
+
+      // Check if cancelled
+      if (abortControllerRef.current?.signal.aborted) {
+        return;
+      }
 
       // Parse with our smart engine
       const result = extractShiftsAuto(rawText, 'ocr');
@@ -145,18 +187,23 @@ export function SmartShiftUpload({ onTextExtracted }: SmartShiftUploadProps) {
       } else {
         onTextExtracted(rawText, result.warnings);
         toast({
-          title: "Image processed",
+          title: "Image processed successfully",
           description: `Extracted ${result.shifts.length} shifts from image using OCR`,
         });
       }
     } catch (error) {
       console.error('Image processing error:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
       toast({
         title: "Image processing failed",
-        description: "Could not process the image file",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
+      setProcessingType(null);
+      abortControllerRef.current = null;
       if (imageInputRef.current) {
         imageInputRef.current.value = '';
       }
@@ -249,19 +296,42 @@ export function SmartShiftUpload({ onTextExtracted }: SmartShiftUploadProps) {
             </div>
           </div>
 
-          {/* OCR Progress */}
-          {ocrLoading && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <RefreshCw className="h-4 w-4 animate-spin" />
-                Processing with OCR... {Math.round(progress)}%
+          {/* Processing Progress */}
+          {(ocrLoading || isProcessing) && (
+            <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  {processingType === 'pdf' && 'Processing PDF...'}
+                  {processingType === 'image' && 'Processing Image with OCR...'}
+                  {processingType === 'text' && 'Parsing Text...'}
+                  {!processingType && 'Processing...'}
+                  {progress > 0 && ` ${Math.round(progress)}%`}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCancel}
+                  className="h-8"
+                >
+                  Cancel
+                </Button>
               </div>
-              <div className="w-full bg-secondary rounded-full h-2">
-                <div 
-                  className="bg-primary h-2 rounded-full transition-all duration-300" 
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
+              
+              {progress > 0 && (
+                <div className="w-full bg-secondary rounded-full h-2">
+                  <div 
+                    className="bg-primary h-2 rounded-full transition-all duration-300" 
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              )}
+              
+              <p className="text-xs text-muted-foreground">
+                {processingType === 'pdf' && 'Extracting text from PDF pages... This may take a minute for large files.'}
+                {processingType === 'image' && 'Running OCR on image... This may take a minute for high-resolution images.'}
+                {processingType === 'text' && 'Analyzing text format and extracting shifts...'}
+              </p>
             </div>
           )}
 

@@ -16,31 +16,58 @@ export function useUploadSession(mobileNumber?: string) {
   
   const { getOrCreateDay, addShiftsToDay, replaceDayShifts, calculateDuration } = useDayManagement(mobileNumber);
 
+  // Retry wrapper for Supabase operations
+  const withRetry = async <T,>(
+    fn: () => Promise<T>,
+    operation: string,
+    retries: number = 3
+  ): Promise<T> => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await fn();
+      } catch (error) {
+        console.log(`${operation} - Attempt ${i + 1} failed:`, error);
+        if (i === retries - 1) {
+          console.error(`${operation} - All retries exhausted`, error);
+          throw error;
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      }
+    }
+    throw new Error(`${operation} failed after all retries`);
+  };
+
   // Start new upload session
   const startUploadSession = async (mobileNumber: string): Promise<string> => {
     try {
-      const { data, error } = await supabase
-        .from('import_sessions')
-        .insert({
-          mobile_number: mobileNumber,
-          status: 'active'
-        })
-        .select()
-        .single();
+      const result = await withRetry(
+        async () => {
+          const { data, error } = await supabase
+            .from('import_sessions')
+            .insert({
+              mobile_number: mobileNumber,
+              status: 'active'
+            })
+            .select()
+            .single();
 
-      if (error) {
-        throw error;
-      }
+          if (error) {
+            throw error;
+          }
+          return data;
+        },
+        'Start upload session'
+      );
 
       setCurrentSession({
-        ...data,
-        session_data: data.session_data as Record<string, any> || {},
-        status: data.status as 'active' | 'completed' | 'cancelled'
+        ...result,
+        session_data: result.session_data as Record<string, any> || {},
+        status: result.status as 'active' | 'completed' | 'cancelled'
       });
-      return data.id;
+      return result.id;
     } catch (err) {
       console.error('Error starting upload session:', err);
-      throw err;
+      throw new Error('Failed to start upload session. Please check your connection and try again.');
     }
   };
 
@@ -280,21 +307,27 @@ export function useUploadSession(mobileNumber?: string) {
   // Update session
   const updateSession = async (sessionId: string, updates: Partial<ImportSession>) => {
     try {
-      const { error } = await supabase
-        .from('import_sessions')
-        .update(updates)
-        .eq('id', sessionId);
+      await withRetry(
+        async () => {
+          const { error } = await supabase
+            .from('import_sessions')
+            .update(updates)
+            .eq('id', sessionId);
 
-      if (error) {
-        throw error;
-      }
+          if (error) {
+            throw error;
+          }
+        },
+        'Update session'
+      );
 
       if (currentSession && currentSession.id === sessionId) {
         setCurrentSession(prev => prev ? { ...prev, ...updates } : null);
       }
     } catch (err) {
       console.error('Error updating session:', err);
-      throw err;
+      // Don't throw - session updates are not critical
+      console.log('Continuing despite session update failure');
     }
   };
 
