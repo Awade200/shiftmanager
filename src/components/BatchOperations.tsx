@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { useDayManagement } from '@/hooks/useDayManagement';
 import { useToast } from '@/hooks/use-toast';
 import { useShifts } from '@/hooks/useShifts';
+import { useMobileAuth } from '@/hooks/useMobileAuth';
 import { Day } from '@/types/day';
 import { format, parseISO, isWithinInterval, subDays, subWeeks, subMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -42,7 +43,8 @@ export function BatchOperations({ className }: BatchOperationsProps) {
   const [statusFilter, setStatusFilter] = useState<'all' | 'ready' | 'conflicts' | 'unresolved'>('all');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const { days, loading } = useDayManagement();
+  const { user } = useMobileAuth();
+  const { days, loading } = useDayManagement(user?.mobile_number);
   const { settings } = useShifts();
   const { toast } = useToast();
 

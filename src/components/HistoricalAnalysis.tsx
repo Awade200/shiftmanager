@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useDayManagement } from '@/hooks/useDayManagement';
 import { useShifts } from '@/hooks/useShifts';
+import { useMobileAuth } from '@/hooks/useMobileAuth';
 import { Day } from '@/types/day';
 import { 
   format, 
@@ -50,7 +51,8 @@ interface MonthlyTrend {
 }
 
 export function HistoricalAnalysis({ className }: HistoricalAnalysisProps) {
-  const { days, loading, dayStats } = useDayManagement();
+  const { user } = useMobileAuth();
+  const { days, loading, dayStats } = useDayManagement(user?.mobile_number);
   const { settings } = useShifts();
 
   // Calculate weekly comparisons (last 8 weeks)

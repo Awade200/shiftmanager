@@ -5,12 +5,14 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 import { TrendingUp, PoundSterling, Clock, Users, Calculator, Receipt } from 'lucide-react';
 import { useDayManagement } from '@/hooks/useDayManagement';
 import { useTaxCalculation } from '@/hooks/useTaxCalculation';
+import { useMobileAuth } from '@/hooks/useMobileAuth';
 import { format, startOfWeek, startOfMonth, isAfter, isBefore, parseISO } from 'date-fns';
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
 
 export default function Analytics() {
-  const { days, dayStats } = useDayManagement();
+  const { user } = useMobileAuth();
+  const { days, dayStats } = useDayManagement(user?.mobile_number);
   const { calculateTax } = useTaxCalculation();
 
   const analytics = useMemo(() => {
