@@ -30,12 +30,6 @@ export const useNotificationPreferences = () => {
 
     try {
       setLoading(true);
-      
-      // Set mobile number for RLS
-      await supabase.rpc('set_config', { 
-        setting_name: 'app.current_mobile_number', 
-        setting_value: user.mobile_number 
-      });
 
       const { data, error } = await supabase
         .from('notification_preferences')
@@ -77,12 +71,6 @@ export const useNotificationPreferences = () => {
     if (!user?.mobile_number) return;
 
     try {
-      // Set mobile number for RLS
-      await supabase.rpc('set_config', { 
-        setting_name: 'app.current_mobile_number', 
-        setting_value: user.mobile_number 
-      });
-
       const updatedPrefs = { ...preferences, ...updates, mobile_number: user.mobile_number };
 
       const { data, error } = await supabase
