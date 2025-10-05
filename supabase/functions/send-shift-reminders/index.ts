@@ -41,13 +41,19 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log('🔔 Starting shift reminder check...');
+    // Get reminder type from request body
+    const { reminder_type = '24h' } = await req.json().catch(() => ({ reminder_type: '24h' }));
+    
+    console.log(`🔔 Starting shift reminder check for ${reminder_type} reminders...`);
 
-    // Calculate target time window (12 hours from now ± 30 minutes)
+    // Calculate target time window based on reminder type
     const now = new Date();
-    const targetTime = new Date(now.getTime() + 12 * 60 * 60 * 1000);
-    const windowStart = new Date(targetTime.getTime() - 30 * 60 * 1000);
-    const windowEnd = new Date(targetTime.getTime() + 30 * 60 * 1000);
+    const hoursBeforeShift = reminder_type === '24h' ? 24 : 2;
+    const windowMinutes = reminder_type === '24h' ? 60 : 30; // Wider window for 24h
+    
+    const targetTime = new Date(now.getTime() + hoursBeforeShift * 60 * 60 * 1000);
+    const windowStart = new Date(targetTime.getTime() - windowMinutes * 60 * 1000);
+    const windowEnd = new Date(targetTime.getTime() + windowMinutes * 60 * 1000);
 
     console.log(`Looking for shifts between ${windowStart.toISOString()} and ${windowEnd.toISOString()}`);
 
@@ -72,6 +78,20 @@ serve(async (req) => {
       const shiftDateTime = new Date(`${shift.date}T${shift.start_time}`);
       
       if (shiftDateTime >= windowStart && shiftDateTime <= windowEnd) {
+        // Check if we've already sent this reminder
+        const { data: existingLog } = await supabase
+          .from('notification_log')
+          .select('id')
+          .eq('shift_id', shift.id)
+          .eq('reminder_type', reminder_type)
+          .eq('status', 'sent')
+          .maybeSingle();
+
+        if (existingLog) {
+          console.log(`Already sent ${reminder_type} reminder for shift ${shift.id}`);
+          continue;
+        }
+
         const { data: prefs } = await supabase
           .from('notification_preferences')
           .select('*')
@@ -88,17 +108,17 @@ serve(async (req) => {
 
     // Send notifications
     for (const { shift, prefs } of notifications) {
-      const message = formatShiftMessage(shift);
+      const message = formatShiftMessage(shift, reminder_type);
 
       // Send Email
       if (prefs.email_enabled && prefs.email) {
         try {
-          await sendEmail(shift, prefs.email, message);
-          await logNotification(supabase, shift.id, shift.mobile_number, 'email', 'sent');
+          await sendEmail(shift, prefs.email, message, reminder_type);
+          await logNotification(supabase, shift.id, shift.mobile_number, 'email', 'sent', reminder_type);
           console.log(`✅ Email sent to ${prefs.email}`);
         } catch (error) {
           console.error('Email error:', error);
-          await logNotification(supabase, shift.id, shift.mobile_number, 'email', 'failed', error.message);
+          await logNotification(supabase, shift.id, shift.mobile_number, 'email', 'failed', reminder_type, error.message);
         }
       }
 
@@ -106,11 +126,11 @@ serve(async (req) => {
       if (prefs.whatsapp_enabled && prefs.phone_number) {
         try {
           await sendWhatsApp(shift, prefs.phone_number, message);
-          await logNotification(supabase, shift.id, shift.mobile_number, 'whatsapp', 'sent');
+          await logNotification(supabase, shift.id, shift.mobile_number, 'whatsapp', 'sent', reminder_type);
           console.log(`✅ WhatsApp sent to ${prefs.phone_number}`);
         } catch (error) {
           console.error('WhatsApp error:', error);
-          await logNotification(supabase, shift.id, shift.mobile_number, 'whatsapp', 'failed', error.message);
+          await logNotification(supabase, shift.id, shift.mobile_number, 'whatsapp', 'failed', reminder_type, error.message);
         }
       }
     }
@@ -138,7 +158,9 @@ serve(async (req) => {
   }
 });
 
-function formatShiftMessage(shift: Shift): string {
+function formatShiftMessage(shift: Shift, reminderType: string): string {
+  const timeText = reminderType === '24h' ? '24 hours' : '2 hours';
+  
   return `🔔 Shift Reminder
 
 📅 Date: ${new Date(shift.date).toLocaleDateString('en-GB')}
@@ -148,14 +170,16 @@ function formatShiftMessage(shift: Shift): string {
 ⏱️ Duration: ${shift.duration} hours
 💰 Earnings: £${shift.earnings.toFixed(2)}
 
-Your shift starts in 12 hours!`;
+Your shift starts in ${timeText}!`;
 }
 
-async function sendEmail(shift: Shift, email: string, message: string) {
+async function sendEmail(shift: Shift, email: string, message: string, reminderType: string) {
+  const timeText = reminderType === '24h' ? '24 hours' : '2 hours';
+  
   const { error } = await resend.emails.send({
     from: 'Shift Reminders <onboarding@resend.dev>',
     to: [email],
-    subject: `🔔 Shift Reminder - ${shift.client_name}`,
+    subject: `🔔 Shift Reminder - ${shift.client_name} (${timeText})`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #2563eb;">Shift Reminder</h2>
@@ -167,7 +191,7 @@ async function sendEmail(shift: Shift, email: string, message: string) {
           <p style="margin: 10px 0;"><strong>⏱️ Duration:</strong> ${shift.duration} hours</p>
           <p style="margin: 10px 0;"><strong>💰 Earnings:</strong> £${shift.earnings.toFixed(2)}</p>
         </div>
-        <p style="color: #059669; font-weight: bold;">Your shift starts in 12 hours!</p>
+        <p style="color: #059669; font-weight: bold;">Your shift starts in ${timeText}!</p>
       </div>
     `,
   });
@@ -212,6 +236,7 @@ async function logNotification(
   mobileNumber: string,
   channel: string,
   status: string,
+  reminderType: string,
   errorMessage?: string
 ) {
   await supabase.from('notification_log').insert({
@@ -219,6 +244,7 @@ async function logNotification(
     mobile_number: mobileNumber,
     channel,
     status,
+    reminder_type: reminderType,
     error_message: errorMessage || null,
   });
 }

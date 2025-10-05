@@ -982,6 +982,7 @@ export type Database = {
           error_message: string | null
           id: string
           mobile_number: string
+          reminder_type: string | null
           sent_at: string | null
           shift_id: string | null
           status: string
@@ -991,6 +992,7 @@ export type Database = {
           error_message?: string | null
           id?: string
           mobile_number: string
+          reminder_type?: string | null
           sent_at?: string | null
           shift_id?: string | null
           status: string
@@ -1000,6 +1002,7 @@ export type Database = {
           error_message?: string | null
           id?: string
           mobile_number?: string
+          reminder_type?: string | null
           sent_at?: string | null
           shift_id?: string | null
           status?: string
