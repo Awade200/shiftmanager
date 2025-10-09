@@ -979,6 +979,7 @@ export type Database = {
       notification_log: {
         Row: {
           channel: string
+          day_date: string | null
           error_message: string | null
           id: string
           mobile_number: string
@@ -989,6 +990,7 @@ export type Database = {
         }
         Insert: {
           channel: string
+          day_date?: string | null
           error_message?: string | null
           id?: string
           mobile_number: string
@@ -999,6 +1001,7 @@ export type Database = {
         }
         Update: {
           channel?: string
+          day_date?: string | null
           error_message?: string | null
           id?: string
           mobile_number?: string
