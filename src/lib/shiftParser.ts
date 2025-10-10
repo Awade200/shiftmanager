@@ -143,7 +143,7 @@ function detectAndParseTableFormat(rawText: string): { isTable: boolean; rows: s
   return { isTable: true, rows };
 }
 
-// Parse Employee Timesheet table format
+// Parse Employee Timesheet table format (handles both single-line and paired-line formats)
 function parseEmployeeTimesheetTable(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr'): ParseResult {
   const { rows } = detectAndParseTableFormat(rawText);
   const shifts: ShiftRow[] = [];
@@ -164,35 +164,14 @@ function parseEmployeeTimesheetTable(rawText: string, sourceType: 'paste' | 'pdf
       continue;
     }
     
-    // Data rows come in pairs:
-    // Row 1: Day/Date | Client Code | Service | Hours
-    // Row 2: (empty) | Client Name | Time Range | (empty)
-    
-    if (i + 1 >= rows.length) {
-      console.warn('Incomplete pair at end of table');
-      break;
-    }
-    
-    const row1 = row;
-    const row2 = rows[i + 1];
-    
-    // Extract from row 1
-    const dayDateStr = row1[0] || '';
-    const clientCode = row1[1] || '';
-    const service = row1[2] || '';
-    const hoursStr = row1[3] || '';
-    
-    // Extract from row 2
-    const clientName = row2[1] || '';
-    const timeRangeStr = row2[2] || '';
-    
-    // Parse day and date from "Monday 06/10/2025" format
+    // Parse day and date from first cell (e.g., "Tuesday 14/10/2025")
+    const dayDateStr = row[0] || '';
     const dayMatch = dayDateStr.match(/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Mon|Tue|Wed|Thu|Fri|Sat|Sun)/i);
     const dateMatch = dayDateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     
     if (!dayMatch || !dateMatch) {
       console.warn(`Could not parse day/date from: ${dayDateStr}`);
-      i += 2;
+      i++;
       continue;
     }
     
@@ -200,41 +179,108 @@ function parseEmployeeTimesheetTable(rawText: string, sourceType: 'paste' | 'pdf
     const [, dayNum, month, year] = dateMatch;
     const date = `${year}-${month.padStart(2, '0')}-${dayNum.padStart(2, '0')}`;
     
-    // Parse time range (e.g., "08:00 - 09:00")
-    const timeMatch = timeRangeStr.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
-    if (!timeMatch) {
-      console.warn(`Could not parse time from: ${timeRangeStr}`);
-      i += 2;
-      continue;
+    // Detect format by checking if next row has time data
+    const nextRow = i + 1 < rows.length ? rows[i + 1] : null;
+    const hasTimeInNextRow = nextRow && nextRow[1] && /\d{1,2}:\d{2}/.test(nextRow[1]);
+    
+    // FORMAT 1: Paired rows (Pages 2-3)
+    // Row 1: Day/Date | Client Code | Service | Hours
+    // Row 2: (empty) | Client Name | Time Range | (empty)
+    if (hasTimeInNextRow) {
+      const clientCode = row[1] || '';
+      const service = row[2] || '';
+      const hoursStr = row[3] || '';
+      
+      const clientName = nextRow[1] || '';
+      const timeRangeStr = nextRow[2] || '';
+      
+      // Parse time range
+      const timeMatch = timeRangeStr.match(/(\d{1,2}:\d{2})\s*[-‑–—]\s*(\d{1,2}:\d{2})/);
+      if (!timeMatch) {
+        console.warn(`Could not parse time from: ${timeRangeStr}`);
+        i += 2;
+        continue;
+      }
+      
+      const startTime = normalizeTime(timeMatch[1]);
+      const endTime = normalizeTime(timeMatch[2]);
+      const hours = parseFloat(hoursStr) || computeHours(startTime, endTime);
+      
+      // Validate client code
+      if (!clientCode.match(/^(CD|EV)\d+/i)) {
+        console.warn(`Invalid client code: ${clientCode}`);
+        i += 2;
+        continue;
+      }
+      
+      shifts.push({
+        day,
+        date,
+        clientCode: clientCode.trim(),
+        clientName: clientName.trim() || 'Unknown Client',
+        service: service.trim() || 'Shift',
+        startTime,
+        endTime,
+        hours,
+        sourceType,
+        rawLines: [dayDateStr, clientCode, service, clientName, timeRangeStr],
+        hoursCorrected: false,
+        needsLocation: !clientName.trim()
+      });
+      
+      i += 2; // Move past both rows
     }
-    
-    const startTime = normalizeTime(timeMatch[1]);
-    const endTime = normalizeTime(timeMatch[2]);
-    const hours = parseFloat(hoursStr) || computeHours(startTime, endTime);
-    
-    // Validate we have minimum required data
-    if (!clientCode.match(/^CD\d+/i)) {
-      console.warn(`Invalid client code: ${clientCode}`);
-      i += 2;
-      continue;
+    // FORMAT 2: Single row with hours only (Page 1)
+    // Day/Date | Client Code + Client Name | Service | Hours
+    else {
+      const clientInfo = row[1] || '';
+      const service = row[2] || '';
+      const hoursStr = row[3] || '';
+      
+      // Extract client code and name from combined field
+      const codeMatch = clientInfo.match(/^(CD|EV)\d+/i);
+      if (!codeMatch) {
+        console.warn(`No client code found in: ${clientInfo}`);
+        i++;
+        continue;
+      }
+      
+      const clientCode = codeMatch[0];
+      const clientName = clientInfo.replace(clientCode, '').trim();
+      
+      const hours = parseFloat(hoursStr);
+      if (isNaN(hours) || hours <= 0) {
+        console.warn(`Invalid hours: ${hoursStr}`);
+        i++;
+        continue;
+      }
+      
+      // Estimate start/end times based on hours (default: 09:00 start)
+      const defaultStartHour = 9;
+      const startTime = `${defaultStartHour.toString().padStart(2, '0')}:00`;
+      const endHour = defaultStartHour + Math.floor(hours);
+      const endMin = Math.round((hours % 1) * 60);
+      const endTime = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
+      
+      shifts.push({
+        day,
+        date,
+        clientCode: clientCode.trim(),
+        clientName: clientName || 'Unknown Client',
+        service: service.trim() || 'Shift',
+        startTime,
+        endTime,
+        hours,
+        sourceType,
+        rawLines: [dayDateStr, clientInfo, service, hoursStr],
+        hoursCorrected: false,
+        needsLocation: !clientName
+      });
+      
+      warnings.push(`Times estimated for ${clientName || clientCode} on ${date} (${hours}h shift starting at ${startTime})`);
+      
+      i++; // Move to next row
     }
-    
-    shifts.push({
-      day,
-      date,
-      clientCode: clientCode.trim(),
-      clientName: clientName.trim() || 'Unknown Client',
-      service: service.trim() || 'Shift',
-      startTime,
-      endTime,
-      hours,
-      sourceType,
-      rawLines: [dayDateStr, clientCode, service, clientName, timeRangeStr],
-      hoursCorrected: false,
-      needsLocation: !clientName
-    });
-    
-    i += 2; // Move to next pair
   }
   
   console.log(`✅ Extracted ${shifts.length} shifts from Employee Timesheet table`);
@@ -646,9 +692,10 @@ export function parseRota(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr' =
 
 // Auto-detect format and route to appropriate parser
 export function extractShiftsAuto(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr'): ParseResult {
-  // Check for Employee Timesheet table format first (highest specificity)
-  if (rawText.includes('|') && rawText.includes('Employee Timesheet')) {
-    console.log('✅ Detected Employee Timesheet table format');
+  // Check for Employee Timesheet format (pipe-delimited or text)
+  if (rawText.includes('Employee Timesheet') && 
+      (rawText.includes('|') || rawText.includes('Run Date:') || rawText.includes('Day Client Service Quantity'))) {
+    console.log('✅ Detected Employee Timesheet format');
     return parseEmployeeTimesheetTable(rawText, sourceType);
   }
   
