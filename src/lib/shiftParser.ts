@@ -565,6 +565,21 @@ export function parseRota(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr' =
     bufferLines = [];
   }
 
+  function emitEstimatedIfPending() {
+    if (pendingHours != null && currentClientCode && currentDate) {
+      const defaultStart = '09:00';
+      const totalMinutes = Math.round(pendingHours * 60);
+      const addHours = Math.floor(totalMinutes / 60);
+      const addMins = totalMinutes % 60;
+      const startHour = 9;
+      const endHour = startHour + addHours;
+      const end = `${endHour.toString().padStart(2, '0')}:${addMins.toString().padStart(2, '0')}`;
+      if (!currentService) currentService = 'Shift';
+      emitShift(defaultStart, end, pendingHours);
+      warnings.push(`Times estimated for ${currentClientName || currentClientCode} on ${normalizeDate(currentDate)} (${pendingHours}h starting at 09:00)`);
+    }
+  }
+
   // Process each line
   lines.forEach((line, idx) => {
     bufferLines.push(line);
@@ -573,6 +588,8 @@ export function parseRota(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr' =
     // Check for day pattern
     const dayMatch = line.match(PATTERNS.day);
     if (dayMatch) {
+      // Boundary: flush any pending shift before new day
+      emitEstimatedIfPending();
       currentDay = dayMatch[1];
       lineProcessed = true;
     }
@@ -580,6 +597,8 @@ export function parseRota(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr' =
     // Check for date pattern (may include client name)
     const dateMatch = line.match(PATTERNS.date);
     if (dateMatch) {
+      // Boundary: flush any pending shift before new date
+      emitEstimatedIfPending();
       currentDate = dateMatch[0];
       // Extract potential client name after date
       const afterDate = line.replace(dateMatch[0], '').trim();
@@ -613,6 +632,10 @@ export function parseRota(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr' =
     // Check for client code (fallback for other formats)
     const codeMatch = line.match(PATTERNS.clientCode);
     if (codeMatch && !codeServiceHoursMatch) {
+      // Boundary: new client encountered, flush any pending hours-only shift
+      if (currentClientCode && pendingHours != null) {
+        emitEstimatedIfPending();
+      }
       currentClientCode = codeMatch[0];
       // Check if client name is on the same line
       const afterCode = line.replace(codeMatch[0], '').trim();
@@ -661,6 +684,11 @@ export function parseRota(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr' =
     }
   });
 
+  // Flush any pending hours-only shift at end
+  if (pendingHours != null && currentClientCode && currentDate) {
+    emitEstimatedIfPending();
+  }
+
   // Validate results
   if (shifts.length === 0) {
     warnings.push('No shifts detected. Please check the format and try again.');
@@ -693,9 +721,8 @@ export function parseRota(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr' =
 // Auto-detect format and route to appropriate parser
 export function extractShiftsAuto(rawText: string, sourceType: 'paste' | 'pdf' | 'ocr'): ParseResult {
   // Check for Employee Timesheet format (pipe-delimited or text)
-  if (rawText.includes('Employee Timesheet') && 
-      (rawText.includes('|') || rawText.includes('Run Date:') || rawText.includes('Day Client Service Quantity'))) {
-    console.log('✅ Detected Employee Timesheet format');
+  if (rawText.includes('Employee Timesheet') && rawText.includes('|')) {
+    console.log('✅ Detected Employee Timesheet table format');
     return parseEmployeeTimesheetTable(rawText, sourceType);
   }
   
