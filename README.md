@@ -1,73 +1,71 @@
-# Welcome to your Lovable project
+# Shift Manager
 
-## Project info
+A web application for people who work rotating or variable shifts and need a clearer way to track schedules, hours and work patterns.
 
-**URL**: https://lovable.dev/projects/48aee5dd-5abd-4ebd-b171-7ab30afb3d5d
+This project is part of my product portfolio and reflects how I approach practical workflow problems: understand the user journey, reduce manual admin, surface useful information and iterate around real use.
 
-## How can I edit this code?
+## What the product covers
 
-There are several ways of editing your application.
+The current product includes workflows for:
 
-**Use Lovable**
+- adding individual shifts
+- pasting or importing shift information
+- viewing today's shifts and all shifts
+- grouping shifts for easier review
+- calendar-based schedule viewing
+- analytics and work-pattern insights
+- authentication and personal settings
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/48aee5dd-5abd-4ebd-b171-7ab30afb3d5d) and start prompting.
+## Product thinking
 
-Changes made via Lovable will be committed automatically to this repo.
+The core problem is simple: shift workers often receive schedules in different formats and then have to manually work out what they are doing, when they are working and how their pattern is changing.
 
-**Use your preferred IDE**
+The product brings those tasks into one place and turns raw shift information into a usable operational view.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Key product themes:
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- **Workflow clarity** — make it fast to capture and review shifts.
+- **Information hierarchy** — show today's work first, then broader schedule context.
+- **Data visibility** — use analytics to make working patterns easier to understand.
+- **Flexible input** — support more than one way of entering shift information.
+- **Privacy-conscious configuration** — application secrets and environment configuration are kept outside source control.
 
-Follow these steps:
+## Technology
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+- shadcn/ui
+- Supabase
+- TanStack Query
+- React Router
+- Recharts
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## Run locally
 
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+git clone https://github.com/Awade200/shiftmanager.git
+cd shiftmanager
+npm install
+cp .env.example .env
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Add your own Supabase project values to `.env` before using features that require the backend.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Why this project matters in my portfolio
 
-**Use GitHub Codespaces**
+Shift Manager demonstrates my ability to move from an everyday operational problem to a structured digital workflow. It also shows hands-on collaboration with product design, frontend implementation, data-backed views and backend services.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+My wider work focuses on Product, HealthTech and operational systems.
 
-## What technologies are used for this project?
+## More about my work
 
-This project is built with:
+- Portfolio: https://lawal-healthtech-portfolio.vercel.app
+- LinkedIn: https://www.linkedin.com/in/lawal-sulaiman-3a4331295/
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+---
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/48aee5dd-5abd-4ebd-b171-7ab30afb3d5d) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+**Lawal Sulaiman Adetunji**  
+Product & Operations | HealthTech | Digital Systems
